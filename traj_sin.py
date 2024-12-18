@@ -7,24 +7,38 @@ import time
 import matplotlib.pyplot as plt
 import numpy as np
 
+ROBOT_TYPE = "franka" # "franka" or "kuka"
+
 class SinusoidalTrajectoryPublisher(Node):
     def __init__(self):
         super().__init__('sinusoidal_trajectory_publisher')
+        
+        self.topic_name = "/cartesian_impedance_controller/target_frame"
+        if ROBOT_TYPE == "franka":
+            self.base = "base"
+            self.end_effector = "fr3_hand_tcp"
+        elif ROBOT_TYPE == "kuka":
+            self.base = "lbr_link_0"
+            self.end_effector = "lbr_link_ee"
+        else:
+            print("Robot type unknown")
+
+        # Variables for the trajectory
+        self.total_duration = 20.0  # Total duration for trajectory
+        self.amplitude = 0.10  # Amplitude of the sinusoidal trajector
+
+        # Sinusoidal parameters
+        self.period = 10.0  # Period of the sinusoidal trajectory
+        self.angular_frequency = 2 * np.pi / self.period  # Angular frequency
+
 
         # Initialize the publisher for PoseStamped messages
-        self.publisher_ = self.create_publisher(PoseStamped, 'lbr/cartesian_impedance_controller/target_frame', 10)
+        self.publisher_ = self.create_publisher(PoseStamped, self.topic_name, 10)
 
         # Initialize tf2 for transforming coordinates
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
 
-        # Variables for the trajectory
-        self.total_duration = 20.0  # Total duration for trajectory
-        self.amplitude = 0.10  # Amplitude of the sinusoidal trajectory (10 cm)
-
-        # Sinusoidal parameters
-        self.period = 10.0  # Period of the sinusoidal trajectory (5 seconds)
-        self.angular_frequency = 2 * np.pi / self.period  # Angular frequency
 
         # Lists to store the commanded and executed trajectories for all axes
         self.commanded_trajectory_x = []
@@ -39,12 +53,17 @@ class SinusoidalTrajectoryPublisher(Node):
         self.initial_orientation = None
         self.initial_position = None
 
-        self.start_time = time.time()
 
         # Timer to periodically publish the trajectory (1 kHz)
         self.timer = self.create_timer(1e-3, self.publish_trajectory)  # 1 ms = 1 kHz
+        self.cycle_iteration = 0
 
     def publish_trajectory(self):
+        self.cycle_iteration +=1
+        if self.cycle_iteration < 2000:
+            self.start_time = time.time()
+            return
+
         # Get the current time
         current_time = time.time()
 
@@ -60,7 +79,7 @@ class SinusoidalTrajectoryPublisher(Node):
         # Get the current position and orientation of the robot's end effector (lbr_link_ee) in the base frame (lbr_link_0)
         try:
             # Get the transform between the end effector and the base link
-            transform: TransformStamped = self.tf_buffer.lookup_transform('lbr_link_0', 'lbr_link_ee', rclpy.time.Time())
+            transform: TransformStamped = self.tf_buffer.lookup_transform(self.base, self.end_effector, rclpy.time.Time())
 
             # Extract the translation (position) and orientation of the end effector
             current_x = transform.transform.translation.x
@@ -87,7 +106,7 @@ class SinusoidalTrajectoryPublisher(Node):
         # Create PoseStamped message for commanded trajectory
         pose = PoseStamped()
         pose.header.stamp = self.get_clock().now().to_msg()
-        pose.header.frame_id = 'lbr_link_0'
+        pose.header.frame_id = self.base
 
         # Set commanded position
         pose.pose.position.x = self.initial_position[0] + commanded_x
