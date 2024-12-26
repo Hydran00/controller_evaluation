@@ -1,4 +1,5 @@
 from initialize import get_robot_params
+
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import PoseStamped
@@ -8,29 +9,23 @@ import time
 import matplotlib.pyplot as plt
 import numpy as np
 
-ROBOT_TYPE = "kuka"  # "franka" or "kuka"
 
-
-class SinusoidalTrajectoryPublisher(Node):
+class LinTrajectoryPublisher(Node):
     def __init__(self):
-        super().__init__("sinusoidal_trajectory_publisher")
+        super().__init__("homing_cart_trajectory_publisher")
 
         self.topic_name, self.base, self.end_effector = get_robot_params()
-
-        # Variables for the trajectory
-        self.total_duration = 20.0  # Total duration for trajectory
-        self.amplitude = 0.10  # Amplitude of the sinusoidal trajector
-
-        # Sinusoidal parameters
-        self.period = 10.0  # Period of the sinusoidal trajectory
-        self.angular_frequency = 2 * np.pi / self.period  # Angular frequency
-
         # Initialize the publisher for PoseStamped messages
         self.publisher_ = self.create_publisher(PoseStamped, self.topic_name, 10)
 
         # Initialize tf2 for transforming coordinates
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
+
+        # Variables for the trajectory
+        self.target_position = (0.3, 0.0, 0.5)  # Target position for the end effector
+        self.total_duration = 0.0
+        self.speed = 0.05  # m/s
 
         # Lists to store the commanded and executed trajectories for all axes
         self.commanded_trajectory_x = []
@@ -45,64 +40,88 @@ class SinusoidalTrajectoryPublisher(Node):
         self.initial_orientation = None
         self.initial_position = None
 
+        self.start_time = time.time()
+        self.last_measurement_time = time.time()
+        self.get_logger().warn(
+            f"Base is {self.base} and end effector is {self.end_effector}"
+        )
+
         # Timer to periodically publish the trajectory (1 kHz)
         self.timer = self.create_timer(1e-3, self.publish_trajectory)  # 1 ms = 1 kHz
-        self.cycle_iteration = 0
+        self.iter = 0
 
     def publish_trajectory(self):
-        self.cycle_iteration += 1
-        if self.cycle_iteration < 2000:
+        while self.iter < 2000:
             self.start_time = time.time()
+            self.iter += 1
             return
-
         # Get the current time
         current_time = time.time()
 
         # Calculate the elapsed time since the start
         elapsed_time = current_time - self.start_time
+        deltaT = current_time - self.last_measurement_time
 
-        if elapsed_time > self.total_duration:
-            self.get_logger().info("Trajectory completed.")
-            self.plot_trajectory()
-            rclpy.shutdown()
-            return
-
-        # Get the current position and orientation of the robot's end effector (lbr_link_ee) in the base frame (lbr_link_0)
+        # Get the current position and orientation of the robot's end effector in the base frame
         try:
             # Get the transform between the end effector and the base link
             transform: TransformStamped = self.tf_buffer.lookup_transform(
                 self.base, self.end_effector, rclpy.time.Time()
             )
-
-            # Extract the translation (position) and orientation of the end effector
-            current_x = transform.transform.translation.x
-            current_y = transform.transform.translation.y
-            current_z = transform.transform.translation.z
-            current_orientation = transform.transform.rotation
-
-            # Set the initial orientation if not already set
-            if self.initial_orientation is None:
-                self.initial_orientation = current_orientation
-                self.initial_position = (current_x, current_y, current_z)
-
-            self.current_pose = (current_x, current_y, current_z)
-            self.get_logger().info(f"Current Pose: {self.current_pose}")
         except Exception as e:
             self.get_logger().warn(f"Could not get the current transform: {e}")
             return
 
-        # Sinusoidal trajectory: x(t) = A * sin(ω * t)
-        commanded_x = self.amplitude * np.sin(self.angular_frequency * elapsed_time)
-        commanded_y = self.initial_position[1]  # Keep y constant
-        commanded_z = self.initial_position[2]  # Keep z constant
+        # Extract the translation (position) and orientation of the end effector
+        current_x = transform.transform.translation.x
+        current_y = transform.transform.translation.y
+        current_z = transform.transform.translation.z
+        current_orientation = transform.transform.rotation
 
+        # Set the initial orientation if not already set
+        if self.initial_orientation is None:
+            self.initial_orientation = current_orientation
+            self.initial_position = (current_x, current_y, current_z)
+
+        self.current_pose = (current_x, current_y, current_z)
+        if (
+            np.linalg.norm(np.array(self.current_pose) - np.array(self.target_position))
+            < 0.005
+        ):
+            self.get_logger().info("Trajectory completed.")
+            self.total_duration = elapsed_time
+            self.plot_trajectory()
+            rclpy.shutdown()
+            return
+
+        if self.iter == 2000:
+            self.distance = np.linalg.norm(
+                np.array(self.current_pose) - np.array(self.target_position)
+            )
+            self.speed_x = (
+                self.target_position[0] - self.current_pose[0]
+            ) / self.distance
+            self.speed_y = (
+                self.target_position[1] - self.current_pose[1]
+            ) / self.distance
+            self.speed_z = (
+                self.target_position[2] - self.current_pose[2]
+            ) / self.distance
+        # self.get_logger().info(f"Current Pose: {self.current_pose}")
+
+        # Linear trajectory: y(t) = A * t
+        commanded_x = current_x + self.speed_x * deltaT
+        commanded_y = current_y + self.speed_y * deltaT
+        commanded_z = current_z + self.speed_z * deltaT
+        self.get_logger().warning(
+            f"Distance Remaining: {np.linalg.norm(np.array(self.current_pose) - np.array(self.target_position))}"
+        )
         # Create PoseStamped message for commanded trajectory
         pose = PoseStamped()
         pose.header.stamp = self.get_clock().now().to_msg()
         pose.header.frame_id = self.base
-
         # Set commanded position
-        pose.pose.position.x = self.initial_position[0] + commanded_x
+        pose.pose.position.x = commanded_x
         pose.pose.position.y = commanded_y
         pose.pose.position.z = commanded_z
 
@@ -113,13 +132,15 @@ class SinusoidalTrajectoryPublisher(Node):
         self.publisher_.publish(pose)
 
         # Store the commanded and executed trajectories for later plotting
-        self.commanded_trajectory_x.append(self.initial_position[0] + commanded_x)
+        self.commanded_trajectory_x.append(commanded_x)
         self.commanded_trajectory_y.append(commanded_y)
         self.commanded_trajectory_z.append(commanded_z)
 
         self.executed_trajectory_x.append(self.current_pose[0])
         self.executed_trajectory_y.append(self.current_pose[1])
         self.executed_trajectory_z.append(self.current_pose[2])
+
+        self.last_measurement_time = current_time
 
     def plot_trajectory(self):
         # Plot the commanded and executed trajectories for all axes
@@ -142,7 +163,7 @@ class SinusoidalTrajectoryPublisher(Node):
             time_steps,
             self.executed_trajectory_x,
             label="Executed X",
-            linestyle="--",
+            linestyle="-",
             color="r",
         )
         plt.xlabel("Time [s]")
@@ -164,7 +185,7 @@ class SinusoidalTrajectoryPublisher(Node):
             time_steps,
             self.executed_trajectory_y,
             label="Executed Y",
-            linestyle="--",
+            linestyle="-",
             color="r",
         )
         plt.xlabel("Time [s]")
@@ -186,7 +207,7 @@ class SinusoidalTrajectoryPublisher(Node):
             time_steps,
             self.executed_trajectory_z,
             label="Executed Z",
-            linestyle="--",
+            linestyle="-",
             color="r",
         )
         plt.xlabel("Time [s]")
@@ -197,12 +218,62 @@ class SinusoidalTrajectoryPublisher(Node):
 
         # Show all plots
         plt.tight_layout()
+
+        # Plot the error between the commanded and executed trajectories
+        plt.figure(figsize=(12, 8))
+
+        # Plot x-axis error
+        plt.subplot(3, 1, 1)
+        error_x = np.array(self.executed_trajectory_x) - np.array(
+            self.commanded_trajectory_x
+        )
+        plt.plot(time_steps, error_x, label="Error X", linestyle="-", color="g")
+        plt.xlabel("Time [s]")
+        plt.ylabel("Error [m]")
+        plt.title("X-Axis Error")
+        plt.legend()
+        plt.grid(True)
+
+        # Plot y-axis error
+        plt.subplot(3, 1, 2)
+        error_y = np.array(self.executed_trajectory_y) - np.array(
+            self.commanded_trajectory_y
+        )
+        plt.plot(time_steps, error_y, label="Error Y", linestyle="-", color="g")
+        plt.xlabel("Time [s]")
+        plt.ylabel("Error [m]")
+        plt.title("Y-Axis Error")
+        plt.legend()
+        plt.grid(True)
+
+        # Plot z-axis error
+        plt.subplot(3, 1, 3)
+        error_z = np.array(self.executed_trajectory_z) - np.array(
+            self.commanded_trajectory_z
+        )
+        plt.plot(time_steps, error_z, label="Error Z", linestyle="-", color="g")
+        plt.xlabel("Time [s]")
+        plt.ylabel("Error [m]")
+        plt.title("Z-Axis Error")
+        plt.legend()
+        plt.grid(True)
+
+        plt.tight_layout()
+
+        # Calculate and print the mean square error for each direction
+        mse_x = np.mean(np.square(error_x))
+        mse_y = np.mean(np.square(error_y))
+        mse_z = np.mean(np.square(error_z))
+
+        self.get_logger().info(
+            f"Mean Square Error - X: {mse_x}, Y: {mse_y}, Z: {mse_z}"
+        )
         plt.show()
 
 
 def main(args=None):
     rclpy.init(args=args)
-    node = SinusoidalTrajectoryPublisher()
+    node = LinTrajectoryPublisher()
     rclpy.spin(node)
 
 
