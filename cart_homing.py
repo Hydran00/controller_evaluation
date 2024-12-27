@@ -2,7 +2,7 @@ from initialize import get_robot_params
 
 import rclpy
 from rclpy.node import Node
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PoseStamped, Quaternion
 from tf2_ros import TransformListener, Buffer
 from geometry_msgs.msg import TransformStamped
 import time
@@ -23,9 +23,15 @@ class LinTrajectoryPublisher(Node):
         self.tf_listener = TransformListener(self.tf_buffer, self)
 
         # Variables for the trajectory
-        self.target_position = (0.3, 0.0, 0.5)  # Target position for the end effector
+        self.target_position = (0.5, 0.3, 0.7)  # Target position for the end effector
+        self.target_orientation = (
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+        )  # Target orientation for the end effector
         self.total_duration = 0.0
-        self.speed = 0.05  # m/s
+        self.max_speed = 0.05  # m/s
 
         # Lists to store the commanded and executed trajectories for all axes
         self.commanded_trajectory_x = []
@@ -49,6 +55,7 @@ class LinTrajectoryPublisher(Node):
         # Timer to periodically publish the trajectory (1 kHz)
         self.timer = self.create_timer(1e-3, self.publish_trajectory)  # 1 ms = 1 kHz
         self.iter = 0
+        self.step = 0
 
     def publish_trajectory(self):
         while self.iter < 2000:
@@ -86,7 +93,7 @@ class LinTrajectoryPublisher(Node):
         self.current_pose = (current_x, current_y, current_z)
         if (
             np.linalg.norm(np.array(self.current_pose) - np.array(self.target_position))
-            < 0.005
+            < 0.2
         ):
             self.get_logger().info("Trajectory completed.")
             self.total_duration = elapsed_time
@@ -98,21 +105,19 @@ class LinTrajectoryPublisher(Node):
             self.distance = np.linalg.norm(
                 np.array(self.current_pose) - np.array(self.target_position)
             )
-            self.speed_x = (
-                self.target_position[0] - self.current_pose[0]
-            ) / self.distance
-            self.speed_y = (
-                self.target_position[1] - self.current_pose[1]
-            ) / self.distance
-            self.speed_z = (
-                self.target_position[2] - self.current_pose[2]
-            ) / self.distance
-        # self.get_logger().info(f"Current Pose: {self.current_pose}")
+            self.direction = (
+                np.array(self.target_position) - np.array(self.current_pose)
+            ) / np.linalg.norm(
+                np.array(self.target_position) - np.array(self.current_pose)
+            )
+            self.speed = self.max_speed * self.direction
 
         # Linear trajectory: y(t) = A * t
-        commanded_x = current_x + self.speed_x * deltaT
-        commanded_y = current_y + self.speed_y * deltaT
-        commanded_z = current_z + self.speed_z * deltaT
+        commanded_x = self.initial_position[0] + self.speed[0] * deltaT * self.step
+        commanded_y = self.initial_position[1] + self.speed[1] * deltaT * self.step
+        commanded_z = self.initial_position[2] + self.speed[2] * deltaT * self.step
+        self.step += 1
+
         self.get_logger().warning(
             f"Distance Remaining: {np.linalg.norm(np.array(self.current_pose) - np.array(self.target_position))}"
         )
@@ -126,7 +131,10 @@ class LinTrajectoryPublisher(Node):
         pose.pose.position.z = commanded_z
 
         # Set orientation to the original orientation of the end effector
-        pose.pose.orientation = self.initial_orientation
+        pose.pose.orientation.x = self.target_orientation[0]
+        pose.pose.orientation.y = self.target_orientation[1]
+        pose.pose.orientation.z = self.target_orientation[2]
+        pose.pose.orientation.w = self.target_orientation[3]
 
         # Publish the message
         self.publisher_.publish(pose)
