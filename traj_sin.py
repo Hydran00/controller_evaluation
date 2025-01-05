@@ -7,8 +7,7 @@ from geometry_msgs.msg import TransformStamped
 import time
 import matplotlib.pyplot as plt
 import numpy as np
-
-ROBOT_TYPE = "kuka"  # "franka" or "kuka"
+from plot import plot_trajectory
 
 
 class SinusoidalTrajectoryPublisher(Node):
@@ -21,8 +20,10 @@ class SinusoidalTrajectoryPublisher(Node):
         self.total_duration = 20.0  # Total duration for trajectory
         self.amplitude = 0.10  # Amplitude of the sinusoidal trajector
 
+        self.axis_flag = [0, 1, 1]  # Which axis to move (x, y, z)
+
         # Sinusoidal parameters
-        self.period = 10.0  # Period of the sinusoidal trajectory
+        self.period = 5.0  # Period of the sinusoidal trajectory
         self.angular_frequency = 2 * np.pi / self.period  # Angular frequency
 
         # Initialize the publisher for PoseStamped messages
@@ -63,7 +64,7 @@ class SinusoidalTrajectoryPublisher(Node):
 
         if elapsed_time > self.total_duration:
             self.get_logger().info("Trajectory completed.")
-            self.plot_trajectory()
+            plot_trajectory(self)
             rclpy.shutdown()
             return
 
@@ -92,9 +93,15 @@ class SinusoidalTrajectoryPublisher(Node):
             return
 
         # Sinusoidal trajectory: x(t) = A * sin(ω * t)
-        commanded_x = self.amplitude * np.sin(self.angular_frequency * elapsed_time)
-        commanded_y = self.initial_position[1]  # Keep y constant
-        commanded_z = self.initial_position[2]  # Keep z constant
+        commanded_x = self.initial_position[0] + self.axis_flag[
+            0
+        ] * self.amplitude * np.sin(self.angular_frequency * elapsed_time)
+        commanded_y = self.initial_position[1] + self.axis_flag[
+            1
+        ] * self.amplitude * np.sin(self.angular_frequency * elapsed_time)
+        commanded_z = self.initial_position[2] + self.axis_flag[
+            2
+        ] * self.amplitude * np.sin(self.angular_frequency * elapsed_time)
 
         # Create PoseStamped message for commanded trajectory
         pose = PoseStamped()
@@ -102,7 +109,7 @@ class SinusoidalTrajectoryPublisher(Node):
         pose.header.frame_id = self.base
 
         # Set commanded position
-        pose.pose.position.x = self.initial_position[0] + commanded_x
+        pose.pose.position.x = commanded_x
         pose.pose.position.y = commanded_y
         pose.pose.position.z = commanded_z
 
@@ -113,91 +120,13 @@ class SinusoidalTrajectoryPublisher(Node):
         self.publisher_.publish(pose)
 
         # Store the commanded and executed trajectories for later plotting
-        self.commanded_trajectory_x.append(self.initial_position[0] + commanded_x)
+        self.commanded_trajectory_x.append(commanded_x)
         self.commanded_trajectory_y.append(commanded_y)
         self.commanded_trajectory_z.append(commanded_z)
 
         self.executed_trajectory_x.append(self.current_pose[0])
         self.executed_trajectory_y.append(self.current_pose[1])
         self.executed_trajectory_z.append(self.current_pose[2])
-
-    def plot_trajectory(self):
-        # Plot the commanded and executed trajectories for all axes
-        time_steps = np.linspace(
-            0, self.total_duration, len(self.commanded_trajectory_x)
-        )
-
-        plt.figure(figsize=(12, 8))
-
-        # Plot x-axis trajectories
-        plt.subplot(3, 1, 1)
-        plt.plot(
-            time_steps,
-            self.commanded_trajectory_x,
-            label="Commanded X",
-            linestyle="-",
-            color="b",
-        )
-        plt.plot(
-            time_steps,
-            self.executed_trajectory_x,
-            label="Executed X",
-            linestyle="--",
-            color="r",
-        )
-        plt.xlabel("Time [s]")
-        plt.ylabel("Position [m]")
-        plt.title("X-Axis: Commanded vs Executed")
-        plt.legend()
-        plt.grid(True)
-
-        # Plot y-axis trajectories
-        plt.subplot(3, 1, 2)
-        plt.plot(
-            time_steps,
-            self.commanded_trajectory_y,
-            label="Commanded Y",
-            linestyle="-",
-            color="b",
-        )
-        plt.plot(
-            time_steps,
-            self.executed_trajectory_y,
-            label="Executed Y",
-            linestyle="--",
-            color="r",
-        )
-        plt.xlabel("Time [s]")
-        plt.ylabel("Position [m]")
-        plt.title("Y-Axis: Commanded vs Executed")
-        plt.legend()
-        plt.grid(True)
-
-        # Plot z-axis trajectories
-        plt.subplot(3, 1, 3)
-        plt.plot(
-            time_steps,
-            self.commanded_trajectory_z,
-            label="Commanded Z",
-            linestyle="-",
-            color="b",
-        )
-        plt.plot(
-            time_steps,
-            self.executed_trajectory_z,
-            label="Executed Z",
-            linestyle="--",
-            color="r",
-        )
-        plt.xlabel("Time [s]")
-        plt.ylabel("Position [m]")
-        plt.title("Z-Axis: Commanded vs Executed")
-        plt.legend()
-        plt.grid(True)
-
-        # Show all plots
-        plt.tight_layout()
-        plt.show()
 
 
 def main(args=None):

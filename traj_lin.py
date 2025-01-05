@@ -6,8 +6,8 @@ from geometry_msgs.msg import PoseStamped
 from tf2_ros import TransformListener, Buffer
 from geometry_msgs.msg import TransformStamped
 import time
-import matplotlib.pyplot as plt
 import numpy as np
+from plot import plot_trajectory
 
 
 class LinTrajectoryPublisher(Node):
@@ -21,10 +21,12 @@ class LinTrajectoryPublisher(Node):
         # Initialize tf2 for transforming coordinates
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
+        self.pub_freq = 1000  # 1 kHz
+        self.settling_time = 2.0  # initial and final buffer time
 
         # Variables for the trajectory
-        self.total_duration = 3.0  # Total duration for trajectory
-        self.delta = 0.05  # Speed of the linear trajectory (2 cm/s)
+        self.total_duration = 1.0  # Total duration for trajectory
+        self.delta = 0.15  # Speed of the linear trajectory (2 cm/s)
 
         # Lists to store the commanded and executed trajectories for all axes
         self.commanded_trajectory_x = []
@@ -38,211 +40,117 @@ class LinTrajectoryPublisher(Node):
         self.current_pose = None
         self.initial_orientation = None
         self.initial_position = None
+        self.cycle_iteration = 0
+        self.move_target = False
+        self.last_cycle_check = 0
 
         self.start_time = time.time()
         self.get_logger().warn(
             f"Base is {self.base} and end effector is {self.end_effector}"
         )
-
+        self.state = "initial_waiting"
         # Timer to periodically publish the trajectory (1 kHz)
-        self.timer = self.create_timer(1e-3, self.publish_trajectory)  # 1 ms = 1 kHz
+        self.timer = self.create_timer(
+            1.0 / self.pub_freq, self.publish_trajectory
+        )  # 1 ms = 1 kHz
 
-    def publish_trajectory(self):
-        # Get the current time
-        current_time = time.time()
-
-        # Calculate the elapsed time since the start
-        elapsed_time = current_time - self.start_time
-
-        if elapsed_time > self.total_duration:
-            self.get_logger().info("Trajectory completed.")
-            self.plot_trajectory()
-            rclpy.shutdown()
-            return
-
-        # Get the current position and orientation of the robot's end effector in the base frame
+    def get_current_transform(self):
         try:
-            # Get the transform between the end effector and the base link
-            transform: TransformStamped = self.tf_buffer.lookup_transform(
+            transform_msg: TransformStamped = self.tf_buffer.lookup_transform(
                 self.base, self.end_effector, rclpy.time.Time()
             )
+            return transform_msg
         except Exception as e:
-            self.get_logger().warn(f"Could not get the current transform: {e}")
+            self.get_logger().warn(f"Failed to get transform: {e}")
+            return None
+
+    def publish_trajectory(self):
+        self.cycle_iteration += 1
+
+        transform_msg = self.get_current_transform()
+        if transform_msg is None:
             return
 
-        # Extract the translation (position) and orientation of the end effector
-        current_x = transform.transform.translation.x
-        current_y = transform.transform.translation.y
-        current_z = transform.transform.translation.z
-        current_orientation = transform.transform.rotation
+        print(f"Cycle iteration: {self.cycle_iteration}")
+        if self.state == "initial_waiting":
+            self.get_logger().info("Initial waiting...")
+            # Set the initial orientation and position
+            if self.initial_orientation is None:
+                self.initial_orientation = transform_msg.transform.rotation
+                self.initial_position = (
+                    transform_msg.transform.translation.x,
+                    transform_msg.transform.translation.y,
+                    transform_msg.transform.translation.z,
+                )
+                self.commanded_x = self.initial_position[0]
+                self.commanded_y = self.initial_position[1]
+                self.commanded_z = self.initial_position[2]
 
-        # Set the initial orientation if not already set
-        if self.initial_orientation is None:
-            self.initial_orientation = current_orientation
-            self.initial_position = (current_x, current_y, current_z)
+            if self.cycle_iteration == int(self.settling_time * self.pub_freq):
+                self.start_time = time.time()
+                self.state = "moving"
+                self.move_target = True
 
-        self.current_pose = (current_x, current_y, current_z)
+        if self.state == "moving":
+            self.get_logger().info("Moving...")
+            # Get the current time
+            current_time = time.time()
+
+            # Calculate the elapsed time since the start
+            elapsed_time = current_time - self.start_time
+            if elapsed_time > self.total_duration:
+                self.move_target = False
+                self.state = "final_waiting"
+
+        if self.state == "final_waiting":
+            self.get_logger().info("Final waiting...")
+            if self.last_cycle_check == int(self.settling_time * self.pub_freq):
+                self.get_logger().info("Trajectory completed")
+                plot_trajectory(self)
+                rclpy.shutdown()
+            self.last_cycle_check += 1
+
+        self.current_pose = (
+            transform_msg.transform.translation.x,
+            transform_msg.transform.translation.y,
+            transform_msg.transform.translation.z,
+        )
+
         # self.get_logger().info(f"Current Pose: {self.current_pose}")
 
-        # Linear trajectory: y(t) = A * t
-        commanded_x = self.initial_position[0] + self.delta * elapsed_time
-        commanded_y = self.initial_position[1]  # + self.delta * elapsed_time
-        commanded_z = self.initial_position[2] - self.delta * elapsed_time
+        if self.move_target:
+            # Update the commanded trajectory based on the elapsed time
+            # Linear trajectory: y(t) = A * t
+            self.commanded_x = self.initial_position[0] + self.delta * elapsed_time
+            self.commanded_y = self.initial_position[1]  # + self.delta * elapsed_time
+            self.commanded_z = self.initial_position[2] - self.delta * elapsed_time
+
         self.get_logger().info(
-            f"Commanded Pose: ({commanded_x}, {commanded_y}, {commanded_z})"
+            f"Commanded Pose: ({self.commanded_x}, {self.commanded_y}, {self.commanded_z})"
         )
-        print(f"Delta: {self.delta * elapsed_time}")
         # Create PoseStamped message for commanded trajectory
-        pose = PoseStamped()
-        pose.header.stamp = self.get_clock().now().to_msg()
-        pose.header.frame_id = self.base
+        target_pose = PoseStamped()
+        target_pose.header.stamp = self.get_clock().now().to_msg()
+        target_pose.header.frame_id = self.base
         # Set commanded position
-        pose.pose.position.x = commanded_x
-        pose.pose.position.y = commanded_y
-        pose.pose.position.z = commanded_z
+        target_pose.pose.position.x = self.commanded_x
+        target_pose.pose.position.y = self.commanded_y
+        target_pose.pose.position.z = self.commanded_z
 
         # Set orientation to the original orientation of the end effector
-        pose.pose.orientation = self.initial_orientation
+        target_pose.pose.orientation = self.initial_orientation
 
         # Publish the message
-        self.publisher_.publish(pose)
+        self.publisher_.publish(target_pose)
 
         # Store the commanded and executed trajectories for later plotting
-        self.commanded_trajectory_x.append(commanded_x)
-        self.commanded_trajectory_y.append(commanded_y)
-        self.commanded_trajectory_z.append(commanded_z)
+        self.commanded_trajectory_x.append(self.commanded_x)
+        self.commanded_trajectory_y.append(self.commanded_y)
+        self.commanded_trajectory_z.append(self.commanded_z)
 
         self.executed_trajectory_x.append(self.current_pose[0])
         self.executed_trajectory_y.append(self.current_pose[1])
         self.executed_trajectory_z.append(self.current_pose[2])
-
-    def plot_trajectory(self):
-        # Plot the commanded and executed trajectories for all axes
-        time_steps = np.linspace(
-            0, self.total_duration, len(self.commanded_trajectory_x)
-        )
-
-        plt.figure(figsize=(12, 8))
-
-        # Plot x-axis trajectories
-        plt.subplot(3, 1, 1)
-        plt.plot(
-            time_steps,
-            self.commanded_trajectory_x,
-            label="Commanded X",
-            linestyle="-",
-            color="b",
-        )
-        plt.plot(
-            time_steps,
-            self.executed_trajectory_x,
-            label="Executed X",
-            linestyle="-",
-            color="r",
-        )
-        plt.xlabel("Time [s]")
-        plt.ylabel("Position [m]")
-        plt.title("X-Axis: Commanded vs Executed")
-        plt.legend()
-        plt.grid(True)
-
-        # Plot y-axis trajectories
-        plt.subplot(3, 1, 2)
-        plt.plot(
-            time_steps,
-            self.commanded_trajectory_y,
-            label="Commanded Y",
-            linestyle="-",
-            color="b",
-        )
-        plt.plot(
-            time_steps,
-            self.executed_trajectory_y,
-            label="Executed Y",
-            linestyle="-",
-            color="r",
-        )
-        plt.xlabel("Time [s]")
-        plt.ylabel("Position [m]")
-        plt.title("Y-Axis: Commanded vs Executed")
-        plt.legend()
-        plt.grid(True)
-
-        # Plot z-axis trajectories
-        plt.subplot(3, 1, 3)
-        plt.plot(
-            time_steps,
-            self.commanded_trajectory_z,
-            label="Commanded Z",
-            linestyle="-",
-            color="b",
-        )
-        plt.plot(
-            time_steps,
-            self.executed_trajectory_z,
-            label="Executed Z",
-            linestyle="-",
-            color="r",
-        )
-        plt.xlabel("Time [s]")
-        plt.ylabel("Position [m]")
-        plt.title("Z-Axis: Commanded vs Executed")
-        plt.legend()
-        plt.grid(True)
-
-        # Show all plots
-        plt.tight_layout()
-
-        # Plot the error between the commanded and executed trajectories
-        plt.figure(figsize=(12, 8))
-
-        # Plot x-axis error
-        plt.subplot(3, 1, 1)
-        error_x = np.array(self.executed_trajectory_x) - np.array(
-            self.commanded_trajectory_x
-        )
-        plt.plot(time_steps, error_x, label="Error X", linestyle="-", color="g")
-        plt.xlabel("Time [s]")
-        plt.ylabel("Error [m]")
-        plt.title("X-Axis Error")
-        plt.legend()
-        plt.grid(True)
-
-        # Plot y-axis error
-        plt.subplot(3, 1, 2)
-        error_y = np.array(self.executed_trajectory_y) - np.array(
-            self.commanded_trajectory_y
-        )
-        plt.plot(time_steps, error_y, label="Error Y", linestyle="-", color="g")
-        plt.xlabel("Time [s]")
-        plt.ylabel("Error [m]")
-        plt.title("Y-Axis Error")
-        plt.legend()
-        plt.grid(True)
-
-        # Plot z-axis error
-        plt.subplot(3, 1, 3)
-        error_z = np.array(self.executed_trajectory_z) - np.array(
-            self.commanded_trajectory_z
-        )
-        plt.plot(time_steps, error_z, label="Error Z", linestyle="-", color="g")
-        plt.xlabel("Time [s]")
-        plt.ylabel("Error [m]")
-        plt.title("Z-Axis Error")
-        plt.legend()
-        plt.grid(True)
-
-        plt.tight_layout()
-
-        # Calculate and print the mean square error for each direction
-        mse_x = np.mean(np.square(error_x))
-        mse_y = np.mean(np.square(error_y))
-        mse_z = np.mean(np.square(error_z))
-
-        self.get_logger().info(
-            f"Mean Square Error - X: {mse_x}, Y: {mse_y}, Z: {mse_z}"
-        )
-        plt.show()
 
 
 def main(args=None):

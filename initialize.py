@@ -1,4 +1,4 @@
-ROBOT_TYPE = "kuka"  # "franka" or "kuka"
+ROBOT_TYPE = "kuka"  # "franka" or "kuka" or "z1"
 
 
 def get_robot_params():
@@ -11,6 +11,10 @@ def get_robot_params():
         base = "lbr_link_0"
         end_effector = "lbr_link_ee"
         prefix = "lbr"
+    elif ROBOT_TYPE == "z1":
+        base = "link00"
+        end_effector = "link06"
+        prefix = "/joint_impedance_controller"
     else:
         print("Robot type unknown")
         exit(1)

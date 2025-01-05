@@ -23,7 +23,7 @@ class LinTrajectoryPublisher(Node):
         self.tf_listener = TransformListener(self.tf_buffer, self)
 
         # Variables for the trajectory
-        self.target_position = (0.5, 0.3, 0.7)  # Target position for the end effector
+        self.target_position = (0.5, 0.3, 0.6)  # Target position for the end effector
         self.target_orientation = (
             1.0,
             0.0,
