@@ -8,12 +8,14 @@ from geometry_msgs.msg import TransformStamped
 import time
 import numpy as np
 from plot import plot_trajectory
+import time
 
 
 class LinTrajectoryPublisher(Node):
     def __init__(self):
         super().__init__("linear_trajectory_publisher")
-
+        # set use_sim_time to True
+        self.use_sim_time = True
         self.topic_name, self.base, self.end_effector = get_robot_params()
         # Initialize the publisher for PoseStamped messages
         self.publisher_ = self.create_publisher(PoseStamped, self.topic_name, 10)
@@ -25,8 +27,8 @@ class LinTrajectoryPublisher(Node):
         self.settling_time = 2.0  # initial and final buffer time
 
         # Variables for the trajectory
-        self.total_duration = 1.0  # Total duration for trajectory
-        self.delta = 0.15  # Speed of the linear trajectory (2 cm/s)
+        self.total_duration = 8.0  # Total duration for trajectory
+        self.delta = -0.2  # Speed of the linear trajectory
 
         # Lists to store the commanded and executed trajectories for all axes
         self.commanded_trajectory_x = []
@@ -48,6 +50,8 @@ class LinTrajectoryPublisher(Node):
         self.get_logger().warn(
             f"Base is {self.base} and end effector is {self.end_effector}"
         )
+        self.get_logger().warn(f"Topic name is {self.topic_name}")
+        time.sleep(1.5)
         self.state = "initial_waiting"
         # Timer to periodically publish the trajectory (1 kHz)
         self.timer = self.create_timer(
@@ -121,9 +125,9 @@ class LinTrajectoryPublisher(Node):
         if self.move_target:
             # Update the commanded trajectory based on the elapsed time
             # Linear trajectory: y(t) = A * t
-            self.commanded_x = self.initial_position[0] + self.delta * elapsed_time
+            self.commanded_x = self.initial_position[0]
             self.commanded_y = self.initial_position[1]  # + self.delta * elapsed_time
-            self.commanded_z = self.initial_position[2] - self.delta * elapsed_time
+            self.commanded_z = self.initial_position[2]  # + self.delta * elapsed_time
 
         self.get_logger().info(
             f"Commanded Pose: ({self.commanded_x}, {self.commanded_y}, {self.commanded_z})"

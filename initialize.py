@@ -14,7 +14,7 @@ def get_robot_params():
     elif ROBOT_TYPE == "z1":
         base = "link00"
         end_effector = "link06"
-        prefix = "/joint_impedance_controller"
+        prefix = "/cartesian_impedance_controller"
     else:
         print("Robot type unknown")
         exit(1)

@@ -15,6 +15,8 @@ class SinusoidalTrajectoryPublisher(Node):
         super().__init__("sinusoidal_trajectory_publisher")
 
         self.topic_name, self.base, self.end_effector = get_robot_params()
+        # print namespace
+        self.get_logger().info(f"Namespace: {self.get_namespace()}")
 
         # Variables for the trajectory
         self.total_duration = 20.0  # Total duration for trajectory
