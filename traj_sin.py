@@ -20,7 +20,7 @@ class SinusoidalTrajectoryPublisher(Node):
 
         # Variables for the trajectory
         self.total_duration = 20.0  # Total duration for trajectory
-        self.amplitude = 0.10  # Amplitude of the sinusoidal trajector
+        self.amplitude = 0.30  # Amplitude of the sinusoidal trajector
 
         self.axis_flag = [0, 1, 1]  # Which axis to move (x, y, z)
 

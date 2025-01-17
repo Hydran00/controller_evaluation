@@ -11,7 +11,7 @@ from plot import plot_trajectory
 import time
 
 
-class LinTrajectoryPublisher(Node):
+class StepResponsePublisher(Node):
     def __init__(self):
         super().__init__("linear_trajectory_publisher")
         # set use_sim_time to True
@@ -19,7 +19,7 @@ class LinTrajectoryPublisher(Node):
         self.topic_name, self.base, self.end_effector = get_robot_params()
         # Initialize the publisher for PoseStamped messages
         self.publisher_ = self.create_publisher(PoseStamped, self.topic_name, 10)
-
+        self.axis_flag = [0, 1, 1]  # Which axis to move (x, y, z)
         # Initialize tf2 for transforming coordinates
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
@@ -94,6 +94,18 @@ class LinTrajectoryPublisher(Node):
                 self.start_time = time.time()
                 self.state = "moving"
                 self.move_target = True
+                self.commanded_x = (
+                    self.initial_position[0] + self.delta * self.axis_flag[0]
+                )
+                self.commanded_y = (
+                    self.initial_position[1] + self.delta * self.axis_flag[1]
+                )
+                self.commanded_z = (
+                    self.initial_position[2] + self.delta * self.axis_flag[2]
+                )
+                self.get_logger().info(
+                    f"Commanded Pose: ({self.commanded_x}, {self.commanded_y}, {self.commanded_z}), \n orientation: {self.initial_orientation}"
+                )
 
         if self.state == "moving":
             self.get_logger().info("Moving...")
@@ -120,18 +132,6 @@ class LinTrajectoryPublisher(Node):
             transform_msg.transform.translation.z,
         )
 
-        # self.get_logger().info(f"Current Pose: {self.current_pose}")
-
-        if self.move_target:
-            # Update the commanded trajectory based on the elapsed time
-            # Linear trajectory: y(t) = A * t
-            self.commanded_x = self.initial_position[0]
-            self.commanded_y = self.initial_position[1] + self.delta * elapsed_time
-            self.commanded_z = self.initial_position[2] + self.delta * elapsed_time
-
-        self.get_logger().info(
-            f"Commanded Pose: ({self.commanded_x}, {self.commanded_y}, {self.commanded_z}), \n orientation: {self.initial_orientation}"
-        )
         # Create PoseStamped message for commanded trajectory
         target_pose = PoseStamped()
         target_pose.header.stamp = self.get_clock().now().to_msg()
@@ -159,7 +159,7 @@ class LinTrajectoryPublisher(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    node = LinTrajectoryPublisher()
+    node = StepResponsePublisher()
     rclpy.spin(node)
 
 

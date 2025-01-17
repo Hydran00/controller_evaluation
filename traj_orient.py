@@ -12,13 +12,15 @@ from plot_cone_constraints import plot_cone_constraints
 from scipy.spatial.transform import Rotation as R
 from scipy.spatial.transform import Slerp
 import time
+from rclpy.parameter import Parameter
 
 
 class LinTrajectoryPublisher(Node):
     def __init__(self):
         super().__init__("linear_trajectory_publisher")
         # set use_sim_time to True
-        self.use_sim_time = True
+        self.set_parameters([Parameter("use_sim_time", Parameter.Type.BOOL, True)])
+
         self.topic_name, self.base, self.end_effector = get_robot_params()
         # Initialize the publisher for PoseStamped messages
         self.publisher_ = self.create_publisher(PoseStamped, self.topic_name, 10)
@@ -30,11 +32,10 @@ class LinTrajectoryPublisher(Node):
         self.settling_time = 2.0  # initial and final buffer time
 
         # Variables for the trajectory
-        self.total_duration = 5.0  # Total duration for trajectory
-        self.target_orientation = R.from_euler(
-            "xyz", [150.0, 20.0, 100.0], degrees=True
-        ).as_quat()
-
+        self.total_duration = 6.0  # Total duration for trajectory
+        self.target_angle_increment = R.from_euler("xyz", [0.3, 0.8, 0.2]).as_euler(
+            "xyz"
+        )
         # Lists to store the commanded and executed trajectories for all axes
         self.commanded_trajectory_x = []
         self.commanded_trajectory_y = []
@@ -60,7 +61,6 @@ class LinTrajectoryPublisher(Node):
             f"Base is {self.base} and end effector is {self.end_effector}"
         )
         self.get_logger().warn(f"Topic name is {self.topic_name}")
-        time.sleep(1.5)
         self.state = "initial_waiting"
         # Timer to periodically publish the trajectory (1 kHz)
         self.timer = self.create_timer(
@@ -82,6 +82,8 @@ class LinTrajectoryPublisher(Node):
 
         transform_msg = self.get_current_transform()
         if transform_msg is None:
+            self.get_logger().warn("Failed getting transform")
+            self.cycle_iteration = 0
             return
 
         current_rot = [
@@ -93,8 +95,6 @@ class LinTrajectoryPublisher(Node):
         self.log_x.append(R.from_quat(current_rot).as_matrix())
 
         if self.state == "initial_waiting":
-            # self.get_logger().info("Initial waiting...")
-            # Set the initial orientation and position
             if self.initial_orientation is None:
                 self.initial_orientation = [
                     transform_msg.transform.rotation.x,
@@ -102,6 +102,16 @@ class LinTrajectoryPublisher(Node):
                     transform_msg.transform.rotation.z,
                     transform_msg.transform.rotation.w,
                 ]
+
+                target_orientation_eul = (
+                    R.from_quat(self.initial_orientation).as_euler("xyz")
+                    + self.target_angle_increment
+                )
+
+                self.target_orientation = R.from_euler(
+                    "xyz", target_orientation_eul
+                ).as_quat()
+
                 self.log_x_init = R.from_quat(self.initial_orientation).as_matrix()
                 self.initial_position = [
                     transform_msg.transform.translation.x,
@@ -112,6 +122,7 @@ class LinTrajectoryPublisher(Node):
                 self.commanded_qy = self.initial_orientation[1]
                 self.commanded_qz = self.initial_orientation[2]
                 self.commanded_qw = self.initial_orientation[3]
+                self.x_ref = R.from_quat(self.initial_orientation).as_matrix()
 
             if self.cycle_iteration == int(self.settling_time * self.pub_freq):
                 self.start_time = time.time()
@@ -119,7 +130,7 @@ class LinTrajectoryPublisher(Node):
                 self.move_target = True
 
         if self.state == "moving":
-            self.get_logger().info("Moving...")
+            # self.get_logger().info("Moving...")
             # Get the current time
             current_time = time.time()
 
@@ -130,7 +141,7 @@ class LinTrajectoryPublisher(Node):
                 self.state = "final_waiting"
 
         if self.state == "final_waiting":
-            self.get_logger().info("Final waiting...")
+            # self.get_logger().info("Final waiting...")
             if self.last_cycle_check == int(self.settling_time * self.pub_freq):
                 self.get_logger().info("Trajectory completed")
                 # plot_trajectory(self)
@@ -140,8 +151,8 @@ class LinTrajectoryPublisher(Node):
                 self.log_u = np.array(self.log_u)
                 plot_cone_constraints(
                     self.log_time,
+                    self.x_ref,
                     self.log_x,
-                    self.log_x_init,
                     None,
                     self.log_u,
                     [0.4, 0.4, 0.4],
@@ -149,33 +160,35 @@ class LinTrajectoryPublisher(Node):
                 rclpy.shutdown()
             self.last_cycle_check += 1
 
-        # self.current_orientation = (
-        #     transform_msg.transform.rotation.x,
-        #     transform_msg.transform.rotation.y,
-        #     transform_msg.transform.rotation.z,
-        #     transform_msg.transform.rotation.w,
-        # )
-
-        # self.get_logger().info(f"Current Pose: {self.current_pose}")
         if self.move_target:
             self.log_time.append(elapsed_time)
-            # slerp between current and target orientation
+
+            # Create rotation objects for initial and target orientations
             rotations = R.from_quat([self.initial_orientation, self.target_orientation])
-            print(rotations)
+
+            # Create a Slerp object to interpolate between the rotations
             slerp = Slerp([0, 1], rotations)
-            # get the orientation at the current time
-            timestep = 1 / (self.total_duration) * elapsed_time
-            if timestep >= 1.0:
-                timestep = 0.999999
-            print("Timestep:", timestep)
-            interpolated_rot = slerp([timestep])
+
+            # Calculate the normalized timestep, clamped to [0, 1)
+            timestep = min(max(elapsed_time / self.total_duration, 0.0), 0.999999)
+
+            # Get the interpolated rotation at the current timestep
+            interpolated_rot = slerp([timestep])[
+                0
+            ]  # Extract the single rotation object
+
+            # Log the rotation as a matrix and quaternion
             self.log_u.append(interpolated_rot.as_matrix())
             interpolated_quat = interpolated_rot.as_quat()
-            print("Timestep:", timestep, "Interpolated Rot:", interpolated_rot)
-            self.commanded_qx = interpolated_quat[0][0]
-            self.commanded_qy = interpolated_quat[0][1]
-            self.commanded_qz = interpolated_quat[0][2]
-            self.commanded_qw = interpolated_quat[0][3]
+
+            # print("Timestep:", timestep, "Interpolated Rot:", interpolated_rot)
+
+            (
+                self.commanded_qx,
+                self.commanded_qy,
+                self.commanded_qz,
+                self.commanded_qw,
+            ) = interpolated_quat
 
         # self.get_logger().info(
         #     f"Commanded Pose: ({self.commanded_qx}, {self.commanded_qy}, {self.commanded_qz}, {self.commanded_qw})"
@@ -197,7 +210,7 @@ class LinTrajectoryPublisher(Node):
 
         # Publish the message
         self.publisher_.publish(target_pose)
-
+        # print(target_pose)
         # Store the commanded and executed trajectories for later plotting
 
         # convert commanded and current to euler angles for plotting
@@ -215,8 +228,7 @@ class LinTrajectoryPublisher(Node):
                 transform_msg.transform.rotation.z,
                 transform_msg.transform.rotation.w,
             ]
-        ).as_euler("xyz", degrees=True)
-        print("Executed:", eul)
+        ).as_quat()  # .as_euler("xyz", degrees=True)
         self.executed_trajectory_x.append(eul[0])
         self.executed_trajectory_y.append(eul[1])
         self.executed_trajectory_z.append(eul[2])
