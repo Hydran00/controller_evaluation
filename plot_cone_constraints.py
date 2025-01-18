@@ -175,20 +175,56 @@ def plot_cone_constraints(time, x_ref, x, h, u, theta):
     )
 
     # Plot the trajectory of x on the unit sphere (projection of x)
-    for t in range(0, x.shape[2], 100):
-        norm_x = np.linalg.norm(x[:, 0, t])  # Normalize each x to have a radius = 1
-        x_proj = x[:, 0, t] / norm_x  # Projection on unit sphere
+    for t in range(0, x.shape[0], 10):
+        norm_x = np.linalg.norm(x[t, :, 0])  # Normalize each x to have a radius = 1
+        x_proj = x[t, :, 0] / norm_x  # Projection on unit sphere
 
-        norm_y = np.linalg.norm(x[:, 1, t])
-        y_proj = x[:, 1, t] / norm_y
+        norm_y = np.linalg.norm(x[t, :, 1])
+        y_proj = x[t, :, 1] / norm_y
 
-        norm_z = np.linalg.norm(x[:, 2, t])
-        z_proj = x[:, 2, t] / norm_z
+        norm_z = np.linalg.norm(x[t, :, 2])
+        z_proj = x[t, :, 2] / norm_z
+
+        norm_x_commanded = np.linalg.norm(
+            u[t, :, 0]
+        )  # Normalize each x to have a radius = 1
+        x_proj_commanded = u[t, :, 0] / norm_x_commanded  # Projection on unit sphere
+
+        norm_y_commanded = np.linalg.norm(u[t, :, 1])
+        y_proj_commanded = u[t, :, 1] / norm_y_commanded
+
+        norm_z_commanded = np.linalg.norm(u[t, :, 2])
+        z_proj_commanded = u[t, :, 2] / norm_z_commanded
 
         # plot projection points
         ax3.scatter(x_proj[0], x_proj[1], x_proj[2], color="r", s=30)
         ax3.scatter(y_proj[0], y_proj[1], y_proj[2], color="g", s=30)
         ax3.scatter(z_proj[0], z_proj[1], z_proj[2], color="b", s=30)
+
+        ax3.scatter(
+            x_proj_commanded[0],
+            x_proj_commanded[1],
+            x_proj_commanded[2],
+            color="darkred",
+            marker="x",
+            s=30,
+        )
+        ax3.scatter(
+            y_proj_commanded[0],
+            y_proj_commanded[1],
+            y_proj_commanded[2],
+            color="darkgreen",
+            marker="x",
+            s=30,
+        )
+        ax3.scatter(
+            z_proj_commanded[0],
+            z_proj_commanded[1],
+            z_proj_commanded[2],
+            color="darkblue",
+            marker="x",
+            s=30,
+        )
 
     # Add half-cones for each axis
     plot_half_cone(ax3, theta[0], x_ref[:, 0], "red", alpha=0.3)

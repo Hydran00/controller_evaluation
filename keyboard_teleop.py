@@ -32,7 +32,7 @@ class KeyboardTeleop(Node):
         signal.signal(signal.SIGINT, self.signal_handler)
         self.total_duration = 5.0
         self.iter = 0
-        self.xyz_increment = 0.02
+        self.xyz_increment = 0.013
         self.rpy_increment = np.radians(3)
         # Use simulation time
         self.set_parameters([Parameter("use_sim_time", Parameter.Type.BOOL, True)])
@@ -115,6 +115,10 @@ class KeyboardTeleop(Node):
                     self.target_position[0] += self.xyz_increment  # X-axis right
                 elif key.name == "left":
                     self.target_position[0] -= self.xyz_increment  # X-axis left
+
+            self.target_orientation_rpy[0] %= 2 * np.pi
+            self.target_orientation_rpy[1] %= 2 * np.pi
+            self.target_orientation_rpy[2] %= 2 * np.pi
         except Exception as e:
             self.get_logger().warn(f"Error processing key press: {e}")
 
@@ -186,6 +190,7 @@ class KeyboardTeleop(Node):
                 self.current_transform.transform.rotation.w,
             ]
         ).as_matrix()
+        self.commanded_trajectory_R[self.iter] = R.from_quat(quat).as_matrix()
         self.timesteps[self.iter] = self.current_time
         self.iter += 1
 
