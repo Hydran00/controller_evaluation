@@ -14,8 +14,9 @@ import time
 class StepResponsePublisher(Node):
     def __init__(self):
         super().__init__("linear_trajectory_publisher")
-        # set use_sim_time to True
-        self.use_sim_time = True
+        # append date
+        self.output_img_name = "outputs/step_response_joint" + time.strftime("%Y%m%d-%H%M%S") + ".png"
+        self.output_txt_name = "outputs/step_response_joint" + time.strftime("%Y%m%d-%H%M%S") + ".txt"
         self.topic_name, self.base, self.end_effector = get_robot_params()
         # Initialize the publisher for PoseStamped messages
         self.publisher_ = self.create_publisher(PoseStamped, self.topic_name, 10)
@@ -28,7 +29,7 @@ class StepResponsePublisher(Node):
 
         # Variables for the trajectory
         self.total_duration = 1.0  # Total duration for trajectory
-        self.delta = -0.3  # Speed of the linear trajectory
+        self.delta = -0.04  # Speed of the linear trajectory
 
         # Lists to store the commanded and executed trajectories for all axes
         self.commanded_trajectory_x = []
@@ -57,6 +58,7 @@ class StepResponsePublisher(Node):
         self.timer = self.create_timer(
             1.0 / self.pub_freq, self.publish_trajectory
         )  # 1 ms = 1 kHz
+        self.log_time = [time.time()]
 
     def get_current_transform(self):
         try:
@@ -155,6 +157,7 @@ class StepResponsePublisher(Node):
         self.executed_trajectory_x.append(self.current_pose[0])
         self.executed_trajectory_y.append(self.current_pose[1])
         self.executed_trajectory_z.append(self.current_pose[2])
+        self.log_time.append(time.time())
 
 
 def main(args=None):
