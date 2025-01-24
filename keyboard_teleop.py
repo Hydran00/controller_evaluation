@@ -30,7 +30,8 @@ class KeyboardTeleop(Node):
         super().__init__("keyboard_control_trajectory_publisher")
         # capture SIGINT signal, e.g., Ctrl+C
         signal.signal(signal.SIGINT, self.signal_handler)
-        self.total_duration = 5.0
+        self.plot_results = False
+        self.total_duration = 1000.0
         self.iter = 0
         self.xyz_increment = 0.013
         self.rpy_increment = np.radians(3)
@@ -153,7 +154,7 @@ class KeyboardTeleop(Node):
             f"Published pose -> Position: {self.target_position}, Orientation (RPY): {np.degrees(self.target_orientation_rpy)}"
         )
         # Store the commanded and executed trajectories for later plotting
-        if self.iter >= self.total_duration * self.pub_freq:
+        if self.plot_results and self.iter >= self.total_duration * self.pub_freq:
             plot_trajectory(self)
             init_orientation_matrix = R.from_quat(self.initial_orientation).as_matrix()
             reference_orientation_matrix = R.from_quat(
