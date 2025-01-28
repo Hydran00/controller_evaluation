@@ -20,9 +20,10 @@ def plot_trajectory(self):
     y_min, y_max = np.min(all_trajectories), np.max(all_trajectories)
 
     # Adjust y-limits symmetrically
-    y_center = (y_min + y_max) / 2
-    y_range = (y_max - y_min) / 2
-    y_lim = (y_center - y_range * 1.05, y_center + y_range * 1.05)  # Add a 10% margin
+    # if self.y_lim is  None:
+        # y_center = (y_min + y_max) / 2
+        # y_range = (y_max - y_min) / 2
+        # y_lim = (y_center - y_range * 1.05, y_center + y_range * 1.05)  # Add a 10% margin
 
     plt.figure(figsize=(12, 8))
 
@@ -42,7 +43,8 @@ def plot_trajectory(self):
         linestyle="--",
         color="r",
     )
-    # plt.ylim(y_lim)  # Set the symmetric y-scale
+    if self.y_lim_x is not None:
+        plt.ylim(self.y_lim_x)
     plt.xlabel("Time [s]")
     plt.ylabel("Position [m]")
     plt.title("X-Axis: Commanded vs Executed")
@@ -65,8 +67,8 @@ def plot_trajectory(self):
         linestyle="--",
         color="r",
     )
-    # plt.ylim(y_lim)  # Set the symmetric y-scale
-    plt.xlabel("Time [s]")
+    if self.y_lim_y is not None:
+        plt.ylim(self.y_lim_y)
     plt.ylabel("Position [m]")
     plt.title("Y-Axis: Commanded vs Executed")
     plt.legend()
@@ -88,8 +90,8 @@ def plot_trajectory(self):
         linestyle="--",
         color="r",
     )
-    # plt.ylim(y_lim)  # Set the symmetric y-scale
-    plt.xlabel("Time [s]")
+    if self.y_lim_z is not None:
+        plt.ylim(self.y_lim_z)
     plt.ylabel("Position [m]")
     plt.title("Z-Axis: Commanded vs Executed")
     plt.legend()

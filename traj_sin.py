@@ -17,12 +17,14 @@ class SinusoidalTrajectoryPublisher(Node):
         self.topic_name, self.base, self.end_effector = get_robot_params()
         # print namespace
         self.get_logger().info(f"Namespace: {self.get_namespace()}")
+        self.output_txt_name = "outputs/sinusoidal_trajectory" + time.strftime("%Y%m%d-%H%M%S") + ".txt"
+        self.output_img_name = "outputs/sinusoidal_trajectory" + time.strftime("%Y%m%d-%H%M%S") + ".png"
 
         # Variables for the trajectory
-        self.total_duration = 20.0  # Total duration for trajectory
-        self.amplitude = 0.30  # Amplitude of the sinusoidal trajector
+        self.total_duration = 5.0  # Total duration for trajectory
+        self.amplitude = 0.05  # Amplitude of the sinusoidal trajector
 
-        self.axis_flag = [0, 1, 1]  # Which axis to move (x, y, z)
+        self.axis_flag = [0, 0, 1.0]  # Which axis to move (x, y, z)
 
         # Sinusoidal parameters
         self.period = 5.0  # Period of the sinusoidal trajectory
@@ -42,6 +44,8 @@ class SinusoidalTrajectoryPublisher(Node):
         self.executed_trajectory_x = []
         self.executed_trajectory_y = []
         self.executed_trajectory_z = []
+        self.log_time = []
+
 
         # Variable to store current robot pose and orientation
         self.current_pose = None
@@ -63,9 +67,11 @@ class SinusoidalTrajectoryPublisher(Node):
 
         # Calculate the elapsed time since the start
         elapsed_time = current_time - self.start_time
+        self.log_time.append(elapsed_time)
 
         if elapsed_time > self.total_duration:
             self.get_logger().info("Trajectory completed.")
+            self.log_time = np.array(self.log_time)
             plot_trajectory(self)
             rclpy.shutdown()
             return
@@ -117,6 +123,8 @@ class SinusoidalTrajectoryPublisher(Node):
 
         # Set orientation to the original orientation of the end effector
         pose.pose.orientation = self.initial_orientation
+
+        self.get_logger().info(f"Target Pose: {pose}")
 
         # Publish the message
         self.publisher_.publish(pose)
