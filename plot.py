@@ -4,7 +4,9 @@ import matplotlib.pyplot as plt
 
 def plot_trajectory(self):
     # Plot the commanded and executed trajectories for all axes
-    time_steps = self.log_time[0:len(self.commanded_trajectory_x)]  #np.linspace(0, self.total_duration, len(self.commanded_trajectory_x))
+    time_steps = self.log_time[
+        0 : len(self.commanded_trajectory_x)
+    ]  # np.linspace(0, self.total_duration, len(self.commanded_trajectory_x))
 
     # Calculate the global y-range across all trajectories
     all_trajectories = np.concatenate(
@@ -20,10 +22,10 @@ def plot_trajectory(self):
     y_min, y_max = np.min(all_trajectories), np.max(all_trajectories)
 
     # Adjust y-limits symmetrically
-    # if self.y_lim is  None:
-        # y_center = (y_min + y_max) / 2
-        # y_range = (y_max - y_min) / 2
-        # y_lim = (y_center - y_range * 1.05, y_center + y_range * 1.05)  # Add a 10% margin
+    # # check has attribute
+    # if hasattr(self, 'y_lim_x'):) = (y_min + y_max) / 2
+    # y_range = (y_max - y_min) / 2
+    # y_lim = (y_center - y_range * 1.05, y_center + y_range * 1.05)  # Add a 10% margin
 
     plt.figure(figsize=(12, 8))
 
@@ -43,7 +45,8 @@ def plot_trajectory(self):
         linestyle="--",
         color="r",
     )
-    if self.y_lim_x is not None:
+    # check has attribute
+    if hasattr(self, "y_lim_x"):
         plt.ylim(self.y_lim_x)
     plt.xlabel("Time [s]")
     plt.ylabel("Position [m]")
@@ -67,7 +70,8 @@ def plot_trajectory(self):
         linestyle="--",
         color="r",
     )
-    if self.y_lim_y is not None:
+    # check has attribute
+    if hasattr(self, "y_lim_y"):
         plt.ylim(self.y_lim_y)
     plt.ylabel("Position [m]")
     plt.title("Y-Axis: Commanded vs Executed")
@@ -90,7 +94,8 @@ def plot_trajectory(self):
         linestyle="--",
         color="r",
     )
-    if self.y_lim_z is not None:
+    # check has attribute
+    if hasattr(self, "y_lim_z"):
         plt.ylim(self.y_lim_z)
     plt.ylabel("Position [m]")
     plt.title("Z-Axis: Commanded vs Executed")
@@ -113,10 +118,9 @@ def plot_trajectory(self):
     mse_y = np.mean(np.square(error_y))
     mse_z = np.mean(np.square(error_z))
     self.get_logger().info(f"Mean Square Error - X: {mse_x}, Y: {mse_y}, Z: {mse_z}")
-    #save error in file 
-    with open(self.output_txt_name, 'w') as f:
+    # save error in file
+    with open(self.output_txt_name, "w") as f:
         f.write(f"Mean Square Error - X: {mse_x}, Y: {mse_y}, Z: {mse_z}")
     # save the plot
     plt.savefig(self.output_img_name)
     plt.show()
-    

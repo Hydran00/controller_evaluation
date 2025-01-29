@@ -30,10 +30,17 @@ class KeyboardTeleop(Node):
         super().__init__("keyboard_control_trajectory_publisher")
         # capture SIGINT signal, e.g., Ctrl+C
         signal.signal(signal.SIGINT, self.signal_handler)
-        self.plot_results = False
-        self.total_duration = 1000.0
+        self.output_img_name = (
+            "outputs/keyboard_teleop-" + time.strftime("%Y%m%d-%H%M%S") + ".png"
+        )
+        self.output_txt_name = (
+            "outputs/keyboard_teleop-" + time.strftime("%Y%m%d-%H%M%S") + ".txt"
+        )
+        self.log_time = [time.time()]
+        self.plot_results = True
+        self.total_duration = 4.0
         self.iter = 0
-        self.xyz_increment = 0.013
+        self.xyz_increment = 0.01
         self.rpy_increment = np.radians(3)
         # Use simulation time
         self.set_parameters([Parameter("use_sim_time", Parameter.Type.BOOL, True)])
@@ -47,7 +54,7 @@ class KeyboardTeleop(Node):
         # TF2 for transform lookup
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
-        self.pub_freq = 100.0  # Hz
+        self.pub_freq = 1000.0  # Hz
 
         # Initialize position and orientation
         self.target_position = [0.0, 0.0, 0.0]  # [x, y, z]
@@ -194,6 +201,7 @@ class KeyboardTeleop(Node):
         self.commanded_trajectory_R[self.iter] = R.from_quat(quat).as_matrix()
         self.timesteps[self.iter] = self.current_time
         self.iter += 1
+        self.log_time.append(time.time())
 
     def get_current_transform(self):
         """Retrieve the current transform between base and end-effector."""
