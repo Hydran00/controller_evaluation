@@ -19,12 +19,6 @@ from scipy.spatial.transform import Rotation as R
 class CTrajPublisher(Node):
     def __init__(self):
         super().__init__("linear_trajectory_publisher")
-        self.output_img_name = (
-            "outputs/cart_traj-" + time.strftime("%Y%m%d-%H%M%S") + ".png"
-        )
-        self.output_txt_name = (
-            "outputs/cart_traj-" + time.strftime("%Y%m%d-%H%M%S") + ".txt"
-        )
         self.topic_name, self.base, self.end_effector = get_robot_params()
         # Initialize the publisher for PoseStamped messages
         self.publisher_ = self.create_publisher(PoseStamped, self.topic_name, 10)
@@ -35,8 +29,16 @@ class CTrajPublisher(Node):
         self.pub_freq = 1000  # 1 kHz
         self.settling_time = 2.0  # initial and final buffer time
 
-        # Variables for the trajectory
-        self.step_size = np.array([-0.1, -0.1, -0.1])
+        # Position increment
+        self.step_size = np.array([-0.05, -0.05, -0.05])
+        # Orientation increment in RPY
+        self.step_orientation = np.array([-0.2, -0.1, -0.2])
+        self.output_img_name = (
+            "outputs/cart_traj_-" + time.strftime("%Y%m%d-%H%M%S") + "-" + str(self.step_size) + str(self.step_orientation) + ".png"
+        )
+        self.output_txt_name = (
+            "outputs/cart_traj_-" + time.strftime("%Y%m%d-%H%M%S") + "-" + str(self.step_size) + str(self.step_orientation) + ".txt"
+        )
         self.velocity = 0.03  # Speed of the linear trajectory
 
         # Lists to store the commanded and executed trajectories for all axes
@@ -46,6 +48,12 @@ class CTrajPublisher(Node):
         self.executed_trajectory_x = []
         self.executed_trajectory_y = []
         self.executed_trajectory_z = []
+        self.commanded_trajectory_R = []
+        self.commanded_trajectory_P = []
+        self.commanded_trajectory_Y = []
+        self.executed_trajectory_R = []
+        self.executed_trajectory_P = []
+        self.executed_trajectory_Y = []
 
         # Variable to store current robot pose and orientation
         self.current_pose = None
@@ -144,7 +152,15 @@ class CTrajPublisher(Node):
                 self.commanded_qw = self.initial_orientation[3]
 
                 self.target_position = self.initial_position + self.step_size
-                self.target_orientation = self.initial_orientation
+                target_orientation_RPY = self.step_orientation + R.from_quat(
+                    self.initial_orientation
+                ).as_euler("xyz")
+                self.target_orientation = R.from_euler(
+                    "xyz", target_orientation_RPY
+                ).as_quat()
+                # print("Initial orientation: ", self.initial_orientation)
+                # print(f"Target orientation: {self.target_orientation}")
+                # exit(0)
 
             if self.cycle_iteration == int(self.settling_time * self.pub_freq):
                 self.start_time = time.time()
@@ -176,6 +192,10 @@ class CTrajPublisher(Node):
             transform_msg.transform.translation.x,
             transform_msg.transform.translation.y,
             transform_msg.transform.translation.z,
+            transform_msg.transform.rotation.x,
+            transform_msg.transform.rotation.y,
+            transform_msg.transform.rotation.z,
+            transform_msg.transform.rotation.w,
         )
 
         # self.get_logger().info(f"Current Pose: {self.current_pose}")
@@ -222,10 +242,27 @@ class CTrajPublisher(Node):
         self.commanded_trajectory_x.append(self.commanded_x)
         self.commanded_trajectory_y.append(self.commanded_y)
         self.commanded_trajectory_z.append(self.commanded_z)
+        (self.commanded_R, self.commanded_P, self.commanded_Y) = R.from_quat(
+            [self.commanded_qx, self.commanded_qy, self.commanded_qz, self.commanded_qw]
+        ).as_euler("xyz")
+        self.commanded_trajectory_R.append(self.commanded_R)
+        self.commanded_trajectory_P.append(self.commanded_P)
+        self.commanded_trajectory_Y.append(self.commanded_Y)
 
         self.executed_trajectory_x.append(self.current_pose[0])
         self.executed_trajectory_y.append(self.current_pose[1])
         self.executed_trajectory_z.append(self.current_pose[2])
+        (self.execute_R, self.execute_P, self.execute_Y) = R.from_quat(
+            [
+                self.current_pose[3],
+                self.current_pose[4],
+                self.current_pose[5],
+                self.current_pose[6],
+            ]
+        ).as_euler("xyz")
+        self.executed_trajectory_R.append(self.execute_R)
+        self.executed_trajectory_P.append(self.execute_P)
+        self.executed_trajectory_Y.append(self.execute_Y)
         self.log_time.append(time.time())
 
 

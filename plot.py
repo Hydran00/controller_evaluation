@@ -30,7 +30,7 @@ def plot_trajectory(self):
     plt.figure(figsize=(12, 8))
 
     # Plot x-axis trajectories
-    plt.subplot(3, 1, 1)
+    plt.subplot(3, 2, 1)
     plt.plot(
         time_steps,
         self.commanded_trajectory_x,
@@ -55,7 +55,7 @@ def plot_trajectory(self):
     plt.grid(True)
 
     # Plot y-axis trajectories
-    plt.subplot(3, 1, 2)
+    plt.subplot(3, 2, 3)
     plt.plot(
         time_steps,
         self.commanded_trajectory_y,
@@ -79,7 +79,7 @@ def plot_trajectory(self):
     plt.grid(True)
 
     # Plot z-axis trajectories
-    plt.subplot(3, 1, 3)
+    plt.subplot(3, 2, 5)
     plt.plot(
         time_steps,
         self.commanded_trajectory_z,
@@ -94,6 +94,55 @@ def plot_trajectory(self):
         linestyle="-",
         color="r",
     )
+
+    if hasattr(self, "commanded_trajectory_R") and hasattr(self, "executed_trajectory_R"):
+        plt.subplot(3, 2, 2)
+        plt.plot(
+            time_steps,
+            self.commanded_trajectory_R,
+            label="Commanded R",
+            linestyle="--",
+            color="g",
+        )
+        plt.plot(
+            time_steps,
+            self.executed_trajectory_R,
+            label="Executed R",
+            linestyle="-",
+            color="y",
+        )
+    if hasattr(self, "commanded_trajectory_P") and hasattr(self, "executed_trajectory_P"):
+        plt.subplot(3, 2, 4)
+        plt.plot(
+            time_steps,
+            self.commanded_trajectory_P,
+            label="Commanded P",
+            linestyle="--",
+            color="g",
+        )
+        plt.plot(
+            time_steps,
+            self.executed_trajectory_P,
+            label="Executed P",
+            linestyle="-",
+            color="y",
+        )
+    if hasattr(self, "commanded_trajectory_Y") and hasattr(self, "executed_trajectory_Y"):
+        plt.subplot(3, 2, 6)
+        plt.plot(
+            time_steps,
+            self.commanded_trajectory_Y,
+            label="Commanded Y",
+            linestyle="--",
+            color="g",
+        )
+        plt.plot(
+            time_steps,
+            self.executed_trajectory_Y,
+            label="Executed Y",
+            linestyle="-",
+            color="y",
+        )
     # check has attribute
     if hasattr(self, "y_lim_z"):
         plt.ylim(self.y_lim_z)
