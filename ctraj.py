@@ -9,29 +9,31 @@ import time
 import numpy as np
 from plot import plot_trajectory
 import time
+import roboticstoolbox as rtb
+from spatialmath import SE3
+from spatialmath.base import UnitQuaternion
+from spatialmath.base import tr2eul, tr2quat
+import scipy.spatial.transform.rotation as R
 
 
-class StepResponsePublisher(Node):
+class LinTrajectoryPublisher(Node):
     def __init__(self):
         super().__init__("linear_trajectory_publisher")
-        # append date
-        self.output_img_name = "outputs/step_response_old_damping-" + time.strftime("%Y%m%d-%H%M%S") + ".png"
-        self.output_txt_name = "outputs/step_response_old_damping-" + time.strftime("%Y%m%d-%H%M%S") + ".txt"
+        # set use_sim_time to True
+        self.use_sim_time = True
         self.topic_name, self.base, self.end_effector = get_robot_params()
         # Initialize the publisher for PoseStamped messages
         self.publisher_ = self.create_publisher(PoseStamped, self.topic_name, 10)
-        self.axis_flag = [0, 1, 1]  # Which axis to move (x, y, z)
+
         # Initialize tf2 for transforming coordinates
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
         self.pub_freq = 1000  # 1 kHz
-        self.settling_time = 3.0  # initial and final buffer time
-        self.plot_margin = 0.03
+        self.settling_time = 2.0  # initial and final buffer time
 
         # Variables for the trajectory
         self.total_duration = 1.0  # Total duration for trajectory
-        self.delta = -0.05  # Speed of the linear trajectory
-
+        self.max_vel = 0.01  # Speed of the linear trajectory
 
         # Lists to store the commanded and executed trajectories for all axes
         self.commanded_trajectory_x = []
@@ -48,6 +50,8 @@ class StepResponsePublisher(Node):
         self.cycle_iteration = 0
         self.move_target = False
         self.last_cycle_check = 0
+        self.traj_computed = False
+        self.traj_idx = 0
 
         self.start_time = time.time()
         self.get_logger().warn(
@@ -60,7 +64,6 @@ class StepResponsePublisher(Node):
         self.timer = self.create_timer(
             1.0 / self.pub_freq, self.publish_trajectory
         )  # 1 ms = 1 kHz
-        self.log_time = [time.time()]
 
     def get_current_transform(self):
         try:
@@ -71,6 +74,22 @@ class StepResponsePublisher(Node):
         except Exception as e:
             self.get_logger().warn(f"Failed to get transform: {e}")
             return None
+
+    def compute_ctraj(self):
+        # Create a SE3 object from the quaternion and translation vector
+        T_start = SE3.Rt(
+            UnitQuaternion(self.initial_orientation, norm=True), self.initial_position
+        )
+        T_end = SE3.Rt(
+            UnitQuaternion(self.initial_orientation, norm=True), self.target_position
+        )
+        steps = self.pub_freq * self.max_vel
+        # Interpolate between the two SE3 objects
+        tg = rtb.ctraj(T_start, T_end, steps)
+        for i in range(0, len(tg)):
+            print(tg[i].t, " # ", tr2eul(tg[i].R))
+        self.trajectory = tg
+        self.traj_computed = True
 
     def publish_trajectory(self):
         self.cycle_iteration += 1
@@ -93,31 +112,12 @@ class StepResponsePublisher(Node):
                 self.commanded_x = self.initial_position[0]
                 self.commanded_y = self.initial_position[1]
                 self.commanded_z = self.initial_position[2]
-
-                plot_center = self.initial_position + self.delta * np.array(self.axis_flag)
-                margin = (abs(self.delta) * self.axis_flag[0] + self.plot_margin)
-
-                self.y_lim_x = (plot_center[0] - margin, self.initial_position[0] + margin)
-                self.y_lim_y = (plot_center[1] - margin, self.initial_position[1] + margin)
-                self.y_lim_z = (plot_center[2] - margin, self.initial_position[2] + margin)
-        
+                self.target_position = self.initial_position + 0.03
 
             if self.cycle_iteration == int(self.settling_time * self.pub_freq):
                 self.start_time = time.time()
                 self.state = "moving"
                 self.move_target = True
-                self.commanded_x = (
-                    self.initial_position[0] + self.delta * self.axis_flag[0]
-                )
-                self.commanded_y = (
-                    self.initial_position[1] + self.delta * self.axis_flag[1]
-                )
-                self.commanded_z = (
-                    self.initial_position[2] + self.delta * self.axis_flag[2]
-                )
-                self.get_logger().info(
-                    f"Commanded Pose: ({self.commanded_x}, {self.commanded_y}, {self.commanded_z}), \n orientation: {self.initial_orientation}"
-                )
 
         if self.state == "moving":
             self.get_logger().info("Moving...")
@@ -133,6 +133,7 @@ class StepResponsePublisher(Node):
         if self.state == "final_waiting":
             self.get_logger().info("Final waiting...")
             if self.last_cycle_check == int(self.settling_time * self.pub_freq):
+                exit(0)
                 self.get_logger().info("Trajectory completed")
                 plot_trajectory(self)
                 rclpy.shutdown()
@@ -144,6 +145,28 @@ class StepResponsePublisher(Node):
             transform_msg.transform.translation.z,
         )
 
+        # self.get_logger().info(f"Current Pose: {self.current_pose}")
+
+        if self.move_target:
+            if self.traj_computed:
+                self.compute_ctraj()
+
+            traj_point = self.trajectory[self.traj_idx]
+            self.traj_idx += 1
+
+            self.commanded_x = traj_point.t[0]
+            self.commanded_y = traj_point.t[1]
+            self.commanded_z = traj_point.t[2]
+
+            orient = R.from_matrix(traj_point.R).as_quat()
+            self.commanded_qx = orient[0]
+            self.commanded_qy = orient[1]
+            self.commanded_qz = orient[2]
+            self.commanded_qw = orient[3]
+
+        self.get_logger().info(
+            f"Commanded Pose: ({self.commanded_x}, {self.commanded_y}, {self.commanded_z}), \n orientation: {self.commanded_qx}, {self.commanded_qy}, {self.commanded_qz}, {self.commanded_qw}"
+        )
         # Create PoseStamped message for commanded trajectory
         target_pose = PoseStamped()
         target_pose.header.stamp = self.get_clock().now().to_msg()
@@ -154,7 +177,10 @@ class StepResponsePublisher(Node):
         target_pose.pose.position.z = self.commanded_z
 
         # Set orientation to the original orientation of the end effector
-        target_pose.pose.orientation = self.initial_orientation
+        target_pose.pose.orientation.x = self.commanded_qx
+        target_pose.pose.orientation.y = self.commanded_qy
+        target_pose.pose.orientation.z = self.commanded_qz
+        target_pose.pose.orientation.w = self.commanded_qw
 
         # Publish the message
         self.publisher_.publish(target_pose)
@@ -167,12 +193,11 @@ class StepResponsePublisher(Node):
         self.executed_trajectory_x.append(self.current_pose[0])
         self.executed_trajectory_y.append(self.current_pose[1])
         self.executed_trajectory_z.append(self.current_pose[2])
-        self.log_time.append(time.time())
 
 
 def main(args=None):
     rclpy.init(args=args)
-    node = StepResponsePublisher()
+    node = LinTrajectoryPublisher()
     rclpy.spin(node)
 
 

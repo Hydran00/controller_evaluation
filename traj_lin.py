@@ -28,7 +28,7 @@ class LinTrajectoryPublisher(Node):
 
         # Variables for the trajectory
         self.total_duration = 1.0  # Total duration for trajectory
-        self.delta = -0.3  # Speed of the linear trajectory
+        self.delta = 0.01  # Speed of the linear trajectory
 
         # Lists to store the commanded and executed trajectories for all axes
         self.commanded_trajectory_x = []
@@ -109,6 +109,7 @@ class LinTrajectoryPublisher(Node):
         if self.state == "final_waiting":
             self.get_logger().info("Final waiting...")
             if self.last_cycle_check == int(self.settling_time * self.pub_freq):
+                exit(0)
                 self.get_logger().info("Trajectory completed")
                 plot_trajectory(self)
                 rclpy.shutdown()
@@ -126,8 +127,8 @@ class LinTrajectoryPublisher(Node):
             # Update the commanded trajectory based on the elapsed time
             # Linear trajectory: y(t) = A * t
             self.commanded_x = self.initial_position[0]
-            self.commanded_y = self.initial_position[1] + self.delta * elapsed_time
-            self.commanded_z = self.initial_position[2] + self.delta * elapsed_time
+            self.commanded_y = self.initial_position[1] + self.delta * elapsed_time / self.total_duration
+            self.commanded_z = self.initial_position[2] + self.delta * elapsed_time / self.total_duration
 
         self.get_logger().info(
             f"Commanded Pose: ({self.commanded_x}, {self.commanded_y}, {self.commanded_z}), \n orientation: {self.initial_orientation}"

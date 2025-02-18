@@ -9,7 +9,7 @@ def get_robot_params():
         prefix = "/cartesian_impedance_controller"
     elif ROBOT_TYPE == "kuka":
         base = "lbr_link_0"
-        end_effector = "lbr_link_ee"
+        end_effector = "probe"
         prefix = "lbr"
     elif ROBOT_TYPE == "z1":
         base = "link00"
