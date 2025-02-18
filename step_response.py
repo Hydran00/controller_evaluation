@@ -15,8 +15,16 @@ class StepResponsePublisher(Node):
     def __init__(self):
         super().__init__("linear_trajectory_publisher")
         # append date
-        self.output_img_name = "outputs/step_response_old_damping-" + time.strftime("%Y%m%d-%H%M%S") + ".png"
-        self.output_txt_name = "outputs/step_response_old_damping-" + time.strftime("%Y%m%d-%H%M%S") + ".txt"
+        self.output_img_name = (
+            "outputs/step_response_old_damping-"
+            + time.strftime("%Y%m%d-%H%M%S")
+            + ".png"
+        )
+        self.output_txt_name = (
+            "outputs/step_response_old_damping-"
+            + time.strftime("%Y%m%d-%H%M%S")
+            + ".txt"
+        )
         self.topic_name, self.base, self.end_effector = get_robot_params()
         # Initialize the publisher for PoseStamped messages
         self.publisher_ = self.create_publisher(PoseStamped, self.topic_name, 10)
@@ -31,7 +39,6 @@ class StepResponsePublisher(Node):
         # Variables for the trajectory
         self.total_duration = 1.0  # Total duration for trajectory
         self.delta = -0.05  # Speed of the linear trajectory
-
 
         # Lists to store the commanded and executed trajectories for all axes
         self.commanded_trajectory_x = []
@@ -94,13 +101,23 @@ class StepResponsePublisher(Node):
                 self.commanded_y = self.initial_position[1]
                 self.commanded_z = self.initial_position[2]
 
-                plot_center = self.initial_position + self.delta * np.array(self.axis_flag)
-                margin = (abs(self.delta) * self.axis_flag[0] + self.plot_margin)
+                plot_center = self.initial_position + self.delta * np.array(
+                    self.axis_flag
+                )
+                margin = abs(self.delta) * self.axis_flag[0] + self.plot_margin
 
-                self.y_lim_x = (plot_center[0] - margin, self.initial_position[0] + margin)
-                self.y_lim_y = (plot_center[1] - margin, self.initial_position[1] + margin)
-                self.y_lim_z = (plot_center[2] - margin, self.initial_position[2] + margin)
-        
+                self.y_lim_x = (
+                    plot_center[0] - margin,
+                    self.initial_position[0] + margin,
+                )
+                self.y_lim_y = (
+                    plot_center[1] - margin,
+                    self.initial_position[1] + margin,
+                )
+                self.y_lim_z = (
+                    plot_center[2] - margin,
+                    self.initial_position[2] + margin,
+                )
 
             if self.cycle_iteration == int(self.settling_time * self.pub_freq):
                 self.start_time = time.time()

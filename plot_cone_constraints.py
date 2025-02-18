@@ -6,7 +6,7 @@ from matplotlib import cm
 
 def plot_cone_constraints(time, x_ref, x, h, u, theta):
     # Create a figure with multiple subplots (2 rows, 2 columns)
-    fig = plt.figure(figsize=(16, 8))
+    fig = plt.figure(figsize=(20, 20))
 
     # Plot the barrier function values over time (subplot 1)
     # if h is not None:
@@ -175,7 +175,7 @@ def plot_cone_constraints(time, x_ref, x, h, u, theta):
     )
 
     # Plot the trajectory of x on the unit sphere (projection of x)
-    for t in range(0, x.shape[0], 10):
+    for t in range(0, x.shape[0], 100):
         norm_x = np.linalg.norm(x[t, :, 0])  # Normalize each x to have a radius = 1
         x_proj = x[t, :, 0] / norm_x  # Projection on unit sphere
 

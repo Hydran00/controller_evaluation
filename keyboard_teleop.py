@@ -38,10 +38,10 @@ class KeyboardTeleop(Node):
         )
         self.log_time = [time.time()]
         self.plot_results = True
-        self.total_duration = 4.0
+        self.total_duration = 20000.0
         self.iter = 0
         self.xyz_increment = 0.01
-        self.rpy_increment = np.radians(3)
+        self.rpy_increment = np.radians(1)
         # Use simulation time
         self.set_parameters([Parameter("use_sim_time", Parameter.Type.BOOL, True)])
 

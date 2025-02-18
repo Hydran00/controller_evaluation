@@ -35,14 +35,14 @@ def plot_trajectory(self):
         time_steps,
         self.commanded_trajectory_x,
         label="Commanded X",
-        linestyle="-",
+        linestyle="--",
         color="b",
     )
     plt.plot(
         time_steps,
         self.executed_trajectory_x,
         label="Executed X",
-        linestyle="--",
+        linestyle="-",
         color="r",
     )
     # check has attribute
@@ -60,14 +60,14 @@ def plot_trajectory(self):
         time_steps,
         self.commanded_trajectory_y,
         label="Commanded Y",
-        linestyle="-",
+        linestyle="--",
         color="b",
     )
     plt.plot(
         time_steps,
         self.executed_trajectory_y,
         label="Executed Y",
-        linestyle="--",
+        linestyle="-",
         color="r",
     )
     # check has attribute
@@ -84,14 +84,14 @@ def plot_trajectory(self):
         time_steps,
         self.commanded_trajectory_z,
         label="Commanded Z",
-        linestyle="-",
+        linestyle="--",
         color="b",
     )
     plt.plot(
         time_steps,
         self.executed_trajectory_z,
         label="Executed Z",
-        linestyle="--",
+        linestyle="-",
         color="r",
     )
     # check has attribute

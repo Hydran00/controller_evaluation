@@ -11,16 +11,20 @@ from plot import plot_trajectory
 import time
 import roboticstoolbox as rtb
 from spatialmath import SE3
-from spatialmath.base import UnitQuaternion
-from spatialmath.base import tr2eul, tr2quat
-import scipy.spatial.transform.rotation as R
+from spatialmath import UnitQuaternion
+from spatialmath.base import tr2eul
+from scipy.spatial.transform import Rotation as R
 
 
-class LinTrajectoryPublisher(Node):
+class CTrajPublisher(Node):
     def __init__(self):
         super().__init__("linear_trajectory_publisher")
-        # set use_sim_time to True
-        self.use_sim_time = True
+        self.output_img_name = (
+            "outputs/cart_traj-" + time.strftime("%Y%m%d-%H%M%S") + ".png"
+        )
+        self.output_txt_name = (
+            "outputs/cart_traj-" + time.strftime("%Y%m%d-%H%M%S") + ".txt"
+        )
         self.topic_name, self.base, self.end_effector = get_robot_params()
         # Initialize the publisher for PoseStamped messages
         self.publisher_ = self.create_publisher(PoseStamped, self.topic_name, 10)
@@ -32,8 +36,8 @@ class LinTrajectoryPublisher(Node):
         self.settling_time = 2.0  # initial and final buffer time
 
         # Variables for the trajectory
-        self.total_duration = 1.0  # Total duration for trajectory
-        self.max_vel = 0.01  # Speed of the linear trajectory
+        self.step_size = np.array([-0.1, -0.1, -0.1])
+        self.velocity = 0.03  # Speed of the linear trajectory
 
         # Lists to store the commanded and executed trajectories for all axes
         self.commanded_trajectory_x = []
@@ -64,6 +68,7 @@ class LinTrajectoryPublisher(Node):
         self.timer = self.create_timer(
             1.0 / self.pub_freq, self.publish_trajectory
         )  # 1 ms = 1 kHz
+        self.log_time = [time.time()]
 
     def get_current_transform(self):
         try:
@@ -78,16 +83,28 @@ class LinTrajectoryPublisher(Node):
     def compute_ctraj(self):
         # Create a SE3 object from the quaternion and translation vector
         T_start = SE3.Rt(
-            UnitQuaternion(self.initial_orientation, norm=True), self.initial_position
+            UnitQuaternion(
+                s=self.initial_orientation[3], v=self.initial_orientation[:3], norm=True
+            ).R,
+            self.initial_position,
         )
         T_end = SE3.Rt(
-            UnitQuaternion(self.initial_orientation, norm=True), self.target_position
+            UnitQuaternion(
+                s=self.target_orientation[3], v=self.target_orientation[:3], norm=True
+            ).R,
+            self.target_position,
         )
-        steps = self.pub_freq * self.max_vel
+
+        distance_between_waypoints = self.velocity / self.pub_freq
+        number_of_samples = int(
+            np.linalg.norm(self.step_size) / distance_between_waypoints
+        )
+        print(f"Number of samples: {number_of_samples}")
         # Interpolate between the two SE3 objects
-        tg = rtb.ctraj(T_start, T_end, steps)
-        for i in range(0, len(tg)):
-            print(tg[i].t, " # ", tr2eul(tg[i].R))
+        tg = rtb.ctraj(T_start, T_end, t=number_of_samples)
+        print("Computed trajectory, len is ", len(tg))
+        # for i in range(0, len(tg)):
+        #     print(tg[i].t, " # ", tr2eul(tg[i].R))
         self.trajectory = tg
         self.traj_computed = True
 
@@ -98,43 +115,59 @@ class LinTrajectoryPublisher(Node):
         if transform_msg is None:
             return
 
-        print(f"Cycle iteration: {self.cycle_iteration}")
+        # print(f"Cycle iteration: {self.cycle_iteration}")
         if self.state == "initial_waiting":
-            self.get_logger().info("Initial waiting...")
             # Set the initial orientation and position
             if self.initial_orientation is None:
-                self.initial_orientation = transform_msg.transform.rotation
-                self.initial_position = (
-                    transform_msg.transform.translation.x,
-                    transform_msg.transform.translation.y,
-                    transform_msg.transform.translation.z,
+                self.get_logger().info("Initial waiting...")
+                self.initial_orientation = np.array(
+                    [
+                        transform_msg.transform.rotation.x,
+                        transform_msg.transform.rotation.y,
+                        transform_msg.transform.rotation.z,
+                        transform_msg.transform.rotation.w,
+                    ]
+                )
+                self.initial_position = np.array(
+                    [
+                        transform_msg.transform.translation.x,
+                        transform_msg.transform.translation.y,
+                        transform_msg.transform.translation.z,
+                    ]
                 )
                 self.commanded_x = self.initial_position[0]
                 self.commanded_y = self.initial_position[1]
                 self.commanded_z = self.initial_position[2]
-                self.target_position = self.initial_position + 0.03
+                self.commanded_qx = self.initial_orientation[0]
+                self.commanded_qy = self.initial_orientation[1]
+                self.commanded_qz = self.initial_orientation[2]
+                self.commanded_qw = self.initial_orientation[3]
+
+                self.target_position = self.initial_position + self.step_size
+                self.target_orientation = self.initial_orientation
 
             if self.cycle_iteration == int(self.settling_time * self.pub_freq):
                 self.start_time = time.time()
                 self.state = "moving"
+                self.get_logger().info("Moving...")
                 self.move_target = True
 
         if self.state == "moving":
-            self.get_logger().info("Moving...")
             # Get the current time
             current_time = time.time()
 
             # Calculate the elapsed time since the start
             elapsed_time = current_time - self.start_time
-            if elapsed_time > self.total_duration:
+            # if elapsed_time > self.total_duration:
+            if self.traj_computed and self.traj_idx >= len(self.trajectory):
                 self.move_target = False
                 self.state = "final_waiting"
+                self.get_logger().info("Final waiting...")
 
         if self.state == "final_waiting":
-            self.get_logger().info("Final waiting...")
             if self.last_cycle_check == int(self.settling_time * self.pub_freq):
-                exit(0)
-                self.get_logger().info("Trajectory completed")
+                # exit(0)
+                # self.get_logger().info("Trajectory completed")
                 plot_trajectory(self)
                 rclpy.shutdown()
             self.last_cycle_check += 1
@@ -148,7 +181,7 @@ class LinTrajectoryPublisher(Node):
         # self.get_logger().info(f"Current Pose: {self.current_pose}")
 
         if self.move_target:
-            if self.traj_computed:
+            if not self.traj_computed:
                 self.compute_ctraj()
 
             traj_point = self.trajectory[self.traj_idx]
@@ -164,9 +197,9 @@ class LinTrajectoryPublisher(Node):
             self.commanded_qz = orient[2]
             self.commanded_qw = orient[3]
 
-        self.get_logger().info(
-            f"Commanded Pose: ({self.commanded_x}, {self.commanded_y}, {self.commanded_z}), \n orientation: {self.commanded_qx}, {self.commanded_qy}, {self.commanded_qz}, {self.commanded_qw}"
-        )
+        # self.get_logger().info(
+        #     f"Commanded Pose: ({self.commanded_x}, {self.commanded_y}, {self.commanded_z}), \n orientation: {self.commanded_qx}, {self.commanded_qy}, {self.commanded_qz}, {self.commanded_qw}"
+        # )
         # Create PoseStamped message for commanded trajectory
         target_pose = PoseStamped()
         target_pose.header.stamp = self.get_clock().now().to_msg()
@@ -193,11 +226,12 @@ class LinTrajectoryPublisher(Node):
         self.executed_trajectory_x.append(self.current_pose[0])
         self.executed_trajectory_y.append(self.current_pose[1])
         self.executed_trajectory_z.append(self.current_pose[2])
+        self.log_time.append(time.time())
 
 
 def main(args=None):
     rclpy.init(args=args)
-    node = LinTrajectoryPublisher()
+    node = CTrajPublisher()
     rclpy.spin(node)
 
 
