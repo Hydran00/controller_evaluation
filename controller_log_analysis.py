@@ -16,7 +16,7 @@ def load_mat_file(filename):
     return data
 
 def convert_orientation_to_euler(matrix_data):
-    euler_angles = np.array([R.from_matrix(m.reshape(3, 3)).as_euler('xyz', degrees=True) for m in matrix_data])
+    euler_angles = np.array([R.from_matrix(m.reshape(3, 3)).as_euler('xyz', degrees=False) for m in matrix_data])
     return euler_angles.T  # Transpose to separate roll, pitch, yaw
 
 def plot_data(data):

@@ -94,6 +94,13 @@ def plot_trajectory(self):
         linestyle="-",
         color="r",
     )
+    if hasattr(self, "y_lim_z"):
+        plt.ylim(self.y_lim_z)
+    plt.xlabel("Time [s]")
+    plt.ylabel("Position [m]")
+    plt.title("Z-Axis: Commanded vs Executed")
+    plt.legend()
+    plt.grid(True)
 
     if hasattr(self, "commanded_trajectory_R") and hasattr(self, "executed_trajectory_R"):
         plt.subplot(3, 2, 2)
@@ -111,6 +118,12 @@ def plot_trajectory(self):
             linestyle="-",
             color="y",
         )
+        if hasattr(self, "y_lim_R"):
+            plt.ylim(self.y_lim_R)
+        plt.ylabel("Position [m]")
+        plt.title("Roll: Commanded vs Executed")
+        plt.legend()
+        plt.grid(True)
     if hasattr(self, "commanded_trajectory_P") and hasattr(self, "executed_trajectory_P"):
         plt.subplot(3, 2, 4)
         plt.plot(
@@ -127,6 +140,12 @@ def plot_trajectory(self):
             linestyle="-",
             color="y",
         )
+        if hasattr(self, "y_lim_P"):
+            plt.ylim(self.y_lim_P)
+        plt.ylabel("Position [m]")
+        plt.title("Pitch: Commanded vs Executed")
+        plt.legend()
+        plt.grid(True)
     if hasattr(self, "commanded_trajectory_Y") and hasattr(self, "executed_trajectory_Y"):
         plt.subplot(3, 2, 6)
         plt.plot(
@@ -143,13 +162,13 @@ def plot_trajectory(self):
             linestyle="-",
             color="y",
         )
-    # check has attribute
-    if hasattr(self, "y_lim_z"):
-        plt.ylim(self.y_lim_z)
-    plt.ylabel("Position [m]")
-    plt.title("Z-Axis: Commanded vs Executed")
-    plt.legend()
-    plt.grid(True)
+        if hasattr(self, "y_lim_Y"):
+            plt.ylim(self.y_lim_Y)
+        plt.xlabel("Time [s]")
+        plt.ylabel("Position [m]")
+        plt.title("Yaw: Commanded vs Executed")
+        plt.legend()
+        plt.grid(True)
 
     # Show all plots
     plt.tight_layout()
