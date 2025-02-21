@@ -32,7 +32,7 @@ class StepResponsePublisher(Node):
         # Initialize tf2 for transforming coordinates
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
-        self.pub_freq = 1000  # 1 kHz
+        self.pub_freq = 500  # 1 kHz
         self.settling_time = 3.0  # initial and final buffer time
         self.plot_margin = 0.03
 

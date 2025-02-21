@@ -33,29 +33,29 @@ def plot_data(data):
     axs[0, 0].set_xlabel("Time (s)")
     axs[0, 0].legend()
 
-    axs[0, 1].plot(time, data['cart_target_y'], 'g--', label="Target Y")
-    axs[0, 1].plot(time, data['cart_current_y'], 'g', label="Current Y")
-    axs[0, 1].set_title("Cartesian Y")
-    axs[0, 1].set_xlabel("Time (s)")
-    axs[0, 1].legend()
-
-    axs[1, 0].plot(time, data['cart_target_z'], 'b--', label="Target Z")
-    axs[1, 0].plot(time, data['cart_current_z'], 'b', label="Current Z")
-    axs[1, 0].set_title("Cartesian Z")
+    axs[1, 0].plot(time, data['cart_target_y'], 'g--', label="Target Y")
+    axs[1, 0].plot(time, data['cart_current_y'], 'g', label="Current Y")
+    axs[1, 0].set_title("Cartesian Y")
     axs[1, 0].set_xlabel("Time (s)")
     axs[1, 0].legend()
 
-    axs[1, 1].plot(time, euler_target[0], 'r--', label="Target Roll")
-    axs[1, 1].plot(time, euler_current[0], 'r', label="Current Roll")
-    axs[1, 1].set_title("Roll")
-    axs[1, 1].set_xlabel("Time (s)")
-    axs[1, 1].legend()
-
-    axs[2, 0].plot(time, euler_target[1], 'g--', label="Target Pitch")
-    axs[2, 0].plot(time, euler_current[1], 'g', label="Current Pitch")
-    axs[2, 0].set_title("Pitch")
+    axs[2, 0].plot(time, data['cart_target_z'], 'b--', label="Target Z")
+    axs[2, 0].plot(time, data['cart_current_z'], 'b', label="Current Z")
+    axs[2, 0].set_title("Cartesian Z")
     axs[2, 0].set_xlabel("Time (s)")
     axs[2, 0].legend()
+
+    axs[0, 1].plot(time, euler_target[0], 'r--', label="Target Roll")
+    axs[0, 1].plot(time, euler_current[0], 'r', label="Current Roll")
+    axs[0, 1].set_title("Roll")
+    axs[0, 1].set_xlabel("Time (s)")
+    axs[0, 1].legend()
+
+    axs[1, 1].plot(time, euler_target[1], 'g--', label="Target Pitch")
+    axs[1, 1].plot(time, euler_current[1], 'g', label="Current Pitch")
+    axs[1, 1].set_title("Pitch")
+    axs[1, 1].set_xlabel("Time (s)")
+    axs[1, 1].legend()
 
     axs[2, 1].plot(time, euler_target[2], 'b--', label="Target Yaw")
     axs[2, 1].plot(time, euler_current[2], 'b', label="Current Yaw")
@@ -102,7 +102,7 @@ def plot_data(data):
 
 
 if __name__ == "__main__":
-    filename = "log.mat"  # Change this to your actual file name
+    filename = "/tmp/cart_impedance.mat"  # Change this to your actual file name
     data = load_mat_file(filename)
     plot_data(data)
 

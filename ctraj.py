@@ -26,20 +26,21 @@ class CTrajPublisher(Node):
         # Initialize tf2 for transforming coordinates
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
-        self.pub_freq = 1000  # 1 kHz
-        self.settling_time = 2.0  # initial and final buffer time
+        self.pub_freq = 500  # 1 kHz
+        self.settling_time = 4.0  # initial and final buffer time
 
         # Position increment
-        self.step_size = np.array([-0.05, -0.05, -0.05])
+        self.step_size = np.array([0.15, 0.0, -0.15])
         # Orientation increment in RPY
-        self.step_orientation = np.array([-0.2, -0.1, -0.2])
+        self.step_orientation = np.array([-0.0, -0.1, 0.2])
+        self.velocity = 0.05  # Speed of the linear trajectory
+        
         self.output_img_name = (
             "outputs/cart_traj_-" + time.strftime("%Y%m%d-%H%M%S") + "-" + str(self.step_size) + str(self.step_orientation) + ".png"
         )
         self.output_txt_name = (
             "outputs/cart_traj_-" + time.strftime("%Y%m%d-%H%M%S") + "-" + str(self.step_size) + str(self.step_orientation) + ".txt"
         )
-        self.velocity = 0.03  # Speed of the linear trajectory
 
         # Lists to store the commanded and executed trajectories for all axes
         self.commanded_trajectory_x = []
