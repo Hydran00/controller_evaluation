@@ -8,6 +8,7 @@ from geometry_msgs.msg import TransformStamped
 import time
 import numpy as np
 from plot import plot_trajectory
+from plot_cone_constraints import plot_cone_constraints
 import time
 import roboticstoolbox as rtb
 from spatialmath import SE3
@@ -30,16 +31,26 @@ class CTrajPublisher(Node):
         self.settling_time = 4.0  # initial and final buffer time
 
         # Position increment
-        self.step_size = np.array([0.15, 0.0, -0.15])
+        self.step_size = np.array([-0.00, 0.1, -0.2])
         # Orientation increment in RPY
-        self.step_orientation = np.array([-0.0, -0.1, 0.2])
-        self.velocity = 0.05  # Speed of the linear trajectory
-        
+        self.step_orientation = np.array([-0.1, -0.0, 0.0])
+        self.velocity = 0.03  # Speed of the linear trajectory
+
         self.output_img_name = (
-            "outputs/cart_traj_-" + time.strftime("%Y%m%d-%H%M%S") + "-" + str(self.step_size) + str(self.step_orientation) + ".png"
+            "outputs/cart_traj_-"
+            + time.strftime("%Y%m%d-%H%M%S")
+            + "-"
+            + str(self.step_size)
+            + str(self.step_orientation)
+            + ".png"
         )
         self.output_txt_name = (
-            "outputs/cart_traj_-" + time.strftime("%Y%m%d-%H%M%S") + "-" + str(self.step_size) + str(self.step_orientation) + ".txt"
+            "outputs/cart_traj_-"
+            + time.strftime("%Y%m%d-%H%M%S")
+            + "-"
+            + str(self.step_size)
+            + str(self.step_orientation)
+            + ".txt"
         )
 
         # Lists to store the commanded and executed trajectories for all axes
@@ -56,6 +67,8 @@ class CTrajPublisher(Node):
         self.executed_trajectory_P = []
         self.executed_trajectory_Y = []
 
+        self.commanded_trajectory_Rmat = []
+        self.executed_trajectory_Rmat = []
         # Variable to store current robot pose and orientation
         self.current_pose = None
         self.initial_orientation = None
@@ -162,6 +175,33 @@ class CTrajPublisher(Node):
                 # print("Initial orientation: ", self.initial_orientation)
                 # print(f"Target orientation: {self.target_orientation}")
                 # exit(0)
+                delta_pos = max(abs(self.step_size))
+                delta_ori = max(0.4, max(abs(self.step_orientation)))
+                self.y_lim_x = (
+                    self.initial_position[0] - delta_pos * 1.1,
+                    self.initial_position[0] + delta_pos * 1.1,
+                )
+                self.y_lim_y = (
+                    self.initial_position[1] - delta_pos * 1.1,
+                    self.initial_position[1] + delta_pos * 1.1,
+                )
+                self.y_lim_z = (
+                    self.initial_position[2] - delta_pos * 1.1,
+                    self.initial_position[2] + delta_pos * 1.1,
+                )
+                initial_RPY = R.from_quat(self.initial_orientation).as_euler("xyz")
+                self.y_lim_R = (
+                    initial_RPY[0] - delta_ori * 0.6,
+                    initial_RPY[0] + delta_ori * 0.6,
+                )
+                self.y_lim_P = (
+                    initial_RPY[1] - delta_ori * 0.6,
+                    initial_RPY[1] + delta_ori * 0.6,
+                )
+                self.y_lim_Y = (
+                    initial_RPY[2] - delta_ori * 0.6,
+                    initial_RPY[2] + delta_ori * 0.6,
+                )
 
             if self.cycle_iteration == int(self.settling_time * self.pub_freq):
                 self.start_time = time.time()
@@ -186,6 +226,14 @@ class CTrajPublisher(Node):
                 # exit(0)
                 # self.get_logger().info("Trajectory completed")
                 plot_trajectory(self)
+                plot_cone_constraints(
+                    None,
+                    R.from_quat(self.initial_orientation).as_matrix(),
+                    self.orientation_trajectory,
+                    None,
+                    self.commanded_trajectory_R,
+                    [0.4, 0.4, 0.4],
+                )
                 rclpy.shutdown()
             self.last_cycle_check += 1
 
@@ -238,6 +286,20 @@ class CTrajPublisher(Node):
 
         # Publish the message
         self.publisher_.publish(target_pose)
+
+        self.commanded_trajectory_Rmat.append(
+            R.from_quat(
+                [
+                    self.commanded_qx,
+                    self.commanded_qy,
+                    self.commanded_qz,
+                    self.commanded_qw,
+                ]
+            ).as_matrix()
+        )
+        self.executed_trajectory_Rmat.append(
+            R.from_quat(self.current_pose[3:]).as_matrix()
+        )
 
         # Store the commanded and executed trajectories for later plotting
         self.commanded_trajectory_x.append(self.commanded_x)

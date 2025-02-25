@@ -33,17 +33,19 @@ def plot_trajectory(self):
     plt.subplot(3, 2, 1)
     plt.plot(
         time_steps,
-        self.commanded_trajectory_x,
-        label="Commanded X",
-        linestyle="--",
-        color="b",
-    )
-    plt.plot(
-        time_steps,
         self.executed_trajectory_x,
         label="Executed X",
         linestyle="-",
         color="r",
+        linewidth=2.5,
+    )
+    plt.plot(
+        time_steps,
+        self.commanded_trajectory_x,
+        label="Commanded X",
+        linestyle="--",
+        color="b",
+        linewidth=2.5,
     )
     # check has attribute
     if hasattr(self, "y_lim_x"):
@@ -51,123 +53,133 @@ def plot_trajectory(self):
     plt.xlabel("Time [s]")
     plt.ylabel("Position [m]")
     plt.title("X-Axis: Commanded vs Executed")
-    plt.legend()
+    plt.legend(fontsize='large')
     plt.grid(True)
 
     # Plot y-axis trajectories
     plt.subplot(3, 2, 3)
     plt.plot(
         time_steps,
-        self.commanded_trajectory_y,
-        label="Commanded Y",
-        linestyle="--",
-        color="b",
-    )
-    plt.plot(
-        time_steps,
         self.executed_trajectory_y,
         label="Executed Y",
         linestyle="-",
         color="r",
+        linewidth=2.5,
+    )
+    plt.plot(
+        time_steps,
+        self.commanded_trajectory_y,
+        label="Commanded Y",
+        linestyle="--",
+        color="b",
+        linewidth=2.5,
     )
     # check has attribute
     if hasattr(self, "y_lim_y"):
         plt.ylim(self.y_lim_y)
     plt.ylabel("Position [m]")
     plt.title("Y-Axis: Commanded vs Executed")
-    plt.legend()
+    plt.legend(fontsize='large')
     plt.grid(True)
 
     # Plot z-axis trajectories
     plt.subplot(3, 2, 5)
     plt.plot(
         time_steps,
-        self.commanded_trajectory_z,
-        label="Commanded Z",
-        linestyle="--",
-        color="b",
-    )
-    plt.plot(
-        time_steps,
         self.executed_trajectory_z,
         label="Executed Z",
         linestyle="-",
         color="r",
+        linewidth=2.5,
+    )
+    plt.plot(
+        time_steps,
+        self.commanded_trajectory_z,
+        label="Commanded Z",
+        linestyle="--",
+        color="b",
+        linewidth=2.5,
     )
     if hasattr(self, "y_lim_z"):
         plt.ylim(self.y_lim_z)
     plt.xlabel("Time [s]")
     plt.ylabel("Position [m]")
     plt.title("Z-Axis: Commanded vs Executed")
-    plt.legend()
+    plt.legend(fontsize='large')
     plt.grid(True)
 
     if hasattr(self, "commanded_trajectory_R") and hasattr(self, "executed_trajectory_R"):
         plt.subplot(3, 2, 2)
         plt.plot(
             time_steps,
-            self.commanded_trajectory_R,
-            label="Commanded R",
-            linestyle="--",
-            color="g",
-        )
-        plt.plot(
-            time_steps,
             self.executed_trajectory_R,
             label="Executed R",
             linestyle="-",
             color="y",
+            linewidth=2.5,
+        )
+        plt.plot(
+            time_steps,
+            self.commanded_trajectory_R,
+            label="Commanded R",
+            linestyle="--",
+            color="g",
+            linewidth=2.5,
         )
         if hasattr(self, "y_lim_R"):
             plt.ylim(self.y_lim_R)
         plt.ylabel("Position [m]")
         plt.title("Roll: Commanded vs Executed")
-        plt.legend()
+        plt.legend(fontsize='large')
         plt.grid(True)
     if hasattr(self, "commanded_trajectory_P") and hasattr(self, "executed_trajectory_P"):
         plt.subplot(3, 2, 4)
-        plt.plot(
-            time_steps,
-            self.commanded_trajectory_P,
-            label="Commanded P",
-            linestyle="--",
-            color="g",
-        )
         plt.plot(
             time_steps,
             self.executed_trajectory_P,
             label="Executed P",
             linestyle="-",
             color="y",
+            linewidth=2.5,
+        )
+        plt.plot(
+            time_steps,
+            self.commanded_trajectory_P,
+            label="Commanded P",
+            linestyle="--",
+            color="g",
+            linewidth=2.5,
         )
         if hasattr(self, "y_lim_P"):
             plt.ylim(self.y_lim_P)
         plt.ylabel("Position [m]")
         plt.title("Pitch: Commanded vs Executed")
-        plt.legend()
+        plt.legend(fontsize='large')
         plt.grid(True)
     if hasattr(self, "commanded_trajectory_Y") and hasattr(self, "executed_trajectory_Y"):
         plt.subplot(3, 2, 6)
-        plt.plot(
-            time_steps,
-            self.commanded_trajectory_Y,
-            label="Commanded Y",
-            linestyle="--",
-            color="g",
-        )
         plt.plot(
             time_steps,
             self.executed_trajectory_Y,
             label="Executed Y",
             linestyle="-",
             color="y",
+            linewidth=2.5,
+        )
+        plt.plot(
+            time_steps,
+            self.commanded_trajectory_Y,
+            label="Commanded Y",
+            linestyle="--",
+            color="g",
+            linewidth=2.5,
         )
         if hasattr(self, "y_lim_Y"):
             plt.ylim(self.y_lim_Y)
         plt.xlabel("Time [s]")
         plt.ylabel("Position [m]")
         plt.title("Yaw: Commanded vs Executed")
-        plt.legend()
+        plt.legend(fontsize='large')
         plt.grid(True)
 
     # Show all plots

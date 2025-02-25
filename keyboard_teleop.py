@@ -38,7 +38,7 @@ class KeyboardTeleop(Node):
         )
         self.log_time = [time.time()]
         self.plot_results = True
-        self.total_duration = 20000.0
+        self.total_duration = 5.0
         self.iter = 0
         self.xyz_increment = 0.01
         self.rpy_increment = np.radians(1)
@@ -149,6 +149,8 @@ class KeyboardTeleop(Node):
 
         # Convert RPY to quaternion
         quat = R.from_euler("xyz", self.target_orientation_rpy).as_quat()
+        # normalize quaternion
+        quat /= np.linalg.norm(quat)
         # Set orientation
         target_pose.pose.orientation.x = quat[0]
         target_pose.pose.orientation.y = quat[1]
@@ -157,9 +159,10 @@ class KeyboardTeleop(Node):
 
         # Publish the message
         self.publisher_.publish(target_pose)
-        self.get_logger().info(
-            f"Published pose -> Position: {self.target_position}, Orientation (RPY): {np.degrees(self.target_orientation_rpy)}"
-        )
+        exit(0)
+        # self.get_logger().info(
+        #     f"Published pose -> Position: {self.target_position}, Orientation (RPY): {np.degrees(self.target_orientation_rpy)}"
+        # )
         # Store the commanded and executed trajectories for later plotting
         if self.plot_results and self.iter >= self.total_duration * self.pub_freq:
             plot_trajectory(self)
@@ -222,6 +225,8 @@ class KeyboardTeleop(Node):
                     transform_msg.transform.rotation.z,
                     transform_msg.transform.rotation.w,
                 ]
+                print("Initial translation: ", self.target_position)
+                print("Initial orientation: ", self.initial_orientation)
                 self.target_orientation_rpy = quat_to_rpy(self.initial_orientation)
                 self.start_time = time.time()
                 self.pose_received = True
